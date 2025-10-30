@@ -54,8 +54,14 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               setState(() {
                 if (card != null && editIndex != null) {
                   flashcards[editIndex] = Flashcard(id: card.id, english: en, vietnamese: vi);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Đã cập nhật thẻ!'))
+                  );
                 } else {
                   flashcards.add(Flashcard(id: const Uuid().v4(), english: en, vietnamese: vi));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Đã thêm flashcard mới!'))
+                  );
                 }
                 currentIndex = flashcards.length - 1;
                 showMeaning = false;
@@ -86,9 +92,12 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                   }
                   showMeaning = false;
                 });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đã xoá flashcard!'))
+                );
                 Navigator.pop(ctx);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
               child: const Text('Xoá'),
           ),
         ],
@@ -119,56 +128,61 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             children: [
               ElevatedButton.icon(
                 onPressed: () => addOrEditFlashcard(),
-                icon: const Icon(Icons.add),
+                icon: const Icon(Icons.add_circle_outline),
                 label: const Text('Thêm thẻ mới'),
+                style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
               ),
-              ElevatedButton.icon(
-                onPressed: () { 
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => Dialog(
-                      child: SizedBox(
-                        width: 340,
-                        height: 420,
-                        child: Column(
-                          children: [
-                            AppBar(title: const Text('Tất cả flashcard'), automaticallyImplyLeading: false),
-                            Expanded(
-                              child: ListView.builder(
-                                itemCount: flashcards.length,
-                                itemBuilder: (ctx, idx) {
-                                  final fc = flashcards[idx];
-                                  return ListTile(
-                                    title: Text(fc.english),
-                                    subtitle: Text(fc.vietnamese),
-                                    leading: Text('${idx+1}'),
-                                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit),
-                                        onPressed: (){
-                                          Navigator.pop(context); 
-                                          addOrEditFlashcard(card: fc, editIndex: idx);
-                                        }),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete),
-                                        onPressed: (){
-                                          Navigator.pop(context);
-                                          deleteFlashcard(idx);
-                                        }),
-                                    ]),
-                                  );
-                                },
+              Tooltip(
+                message: "Quản lý tất cả thẻ",
+                child: ElevatedButton.icon(
+                  onPressed: () { 
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => Dialog(
+                        child: SizedBox(
+                          width: 340,
+                          height: 420,
+                          child: Column(
+                            children: [
+                              AppBar(title: const Text('Tất cả flashcard'), automaticallyImplyLeading: false),
+                              Expanded(
+                                child: ListView.builder(
+                                  itemCount: flashcards.length,
+                                  itemBuilder: (ctx, idx) {
+                                    final fc = flashcards[idx];
+                                    return ListTile(
+                                      title: Text(fc.english),
+                                      subtitle: Text(fc.vietnamese),
+                                      leading: Text('${idx+1}'),
+                                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit),
+                                          onPressed: (){
+                                            Navigator.pop(context); 
+                                            addOrEditFlashcard(card: fc, editIndex: idx);
+                                          }),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete),
+                                          onPressed: (){
+                                            Navigator.pop(context);
+                                            deleteFlashcard(idx);
+                                          }),
+                                      ]),
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.list),
-                label: const Text('Quản lý tất cả'),
-              )
+                    );
+                  },
+                  icon: const Icon(Icons.menu_book_outlined),
+                  label: const Text('Quản lý tất cả'),
+                  style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -178,25 +192,50 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 onTap: () {
                   setState(() => showMeaning = !showMeaning);
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 400),
+                child: SizedBox(
                   width: 250,
                   height: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.indigo[100],
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8,
-                        offset: Offset(2, 2),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 550),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      final flipAnim = Tween(begin: 0.0, end: 1.0).animate(animation);
+                      return AnimatedBuilder(
+                        animation: flipAnim,
+                        child: child,
+                        builder: (context, child) {
+                          final isReverse = (showMeaning && flipAnim.value < 0.5) || (!showMeaning && flipAnim.value > 0.5);
+                          final angle = isReverse ? flipAnim.value - 1 : flipAnim.value;
+                          return Transform(
+                            transform: Matrix4.identity()..setEntry(3, 2, 0.001)
+                              ..rotateY(angle * 3.1416),
+                            alignment: Alignment.center,
+                            child: child,
+                          );
+                        },
+                      );
+                    },
+                    layoutBuilder: (widget, list) => Stack(children: [if (widget != null) widget, ...list]),
+                    switchInCurve: Curves.easeInOutBack,
+                    switchOutCurve: Curves.easeInOutBack,
+                    child: Container(
+                      key: ValueKey(showMeaning),
+                      decoration: BoxDecoration(
+                        color: showMeaning ? Colors.teal[100] : Colors.indigo[100],
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8,
+                            offset: Offset(2, 2),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    showMeaning ? card.vietnamese : card.english,
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                      alignment: Alignment.center,
+                      child: Text(
+                        showMeaning ? card.vietnamese : card.english,
+                        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
                 ),
               ),

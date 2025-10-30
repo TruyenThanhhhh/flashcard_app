@@ -15,6 +15,7 @@ class _LearningScreenState extends State<LearningScreen> {
   late List<bool> rememberedCards;
   int index = 0;
   bool showAnswer = false;
+  bool showTip = true;
 
   @override
   void initState() {
@@ -30,8 +31,10 @@ class _LearningScreenState extends State<LearningScreen> {
         index++;
         showAnswer = false;
       } else {
-        // Học xong tất cả các thẻ
         Future.delayed(const Duration(milliseconds: 200), () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Học xong chủ đề!')),
+          );
           showDialog(
             context: context,
             builder: (_) => AlertDialog(
@@ -48,7 +51,7 @@ class _LearningScreenState extends State<LearningScreen> {
                   onPressed: (){
                     Navigator.of(context)
                         ..pop()
-                        ..pop(); // Quay lại chủ đề
+                        ..pop();
                   },
                   child: const Text('OK'))
               ],
@@ -76,28 +79,66 @@ class _LearningScreenState extends State<LearningScreen> {
           children: [
             Text('${index+1}/${cards.length}', style: const TextStyle(fontSize: 20)),
             const SizedBox(height: 16),
+            if (showTip)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Card(
+                  color: Colors.amber[50],
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    leading: const Icon(Icons.touch_app, color: Colors.amber),
+                    title: const Text('Chạm vào thẻ để lật nghĩa!'),
+                    trailing: IconButton(icon:const Icon(Icons.close),onPressed:(){setState(()=>showTip=false);}),
+                  ),
+                ),
+              ),
             GestureDetector(
-              onTap: () => setState(() => showAnswer = !showAnswer),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
+              onTap: () { setState((){ showAnswer = !showAnswer; showTip=false; }); },
+              child: SizedBox(
                 width: 280,
                 height: 160,
-                decoration: BoxDecoration(
-                  color: showAnswer ? Colors.teal[100] : Colors.indigo[100],
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 8,
-                      offset: Offset(2, 2),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 550),
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    final flipAnim = Tween(begin: 0.0, end: 1.0).animate(animation);
+                    return AnimatedBuilder(
+                      animation: flipAnim,
+                      child: child,
+                      builder: (context, child) {
+                        final isReverse = (showAnswer && flipAnim.value < 0.5) || (!showAnswer && flipAnim.value > 0.5);
+                        final angle = isReverse ? flipAnim.value - 1 : flipAnim.value;
+                        return Transform(
+                          transform: Matrix4.identity()..setEntry(3, 2, 0.001)
+                            ..rotateY(angle * 3.1416),
+                          alignment: Alignment.center,
+                          child: child,
+                        );
+                      },
+                    );
+                  },
+                  layoutBuilder: (widget, list) => Stack(children: [if (widget != null) widget, ...list]),
+                  switchInCurve: Curves.easeInOutBack,
+                  switchOutCurve: Curves.easeInOutBack,
+                  child: Container(
+                    key: ValueKey(showAnswer),
+                    decoration: BoxDecoration(
+                      color: showAnswer ? Colors.teal[100] : Colors.indigo[100],
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 8,
+                          offset: Offset(2,2),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  showAnswer ? card.vietnamese : card.english,
-                  style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.center,
+                    alignment: Alignment.center,
+                    child: Text(
+                      showAnswer ? card.vietnamese : card.english,
+                      style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w600),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -105,25 +146,35 @@ class _LearningScreenState extends State<LearningScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.visibility),
-                  label: Text(showAnswer ? 'Ẩn nghĩa' : 'Xoay thẻ'),
-                  onPressed: () => setState(() => showAnswer = !showAnswer),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange[700],
+                Tooltip(
+                  message: showAnswer ? 'Ẩn nghĩa' : 'Xoay thẻ',
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.visibility),
+                    label: Text(showAnswer ? 'Ẩn nghĩa' : 'Xoay thẻ'),
+                    onPressed: () => setState(() => showAnswer = !showAnswer),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange[700],
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))
+                    ),
                   ),
                 ),
                 const SizedBox(width: 18),
-                ElevatedButton(
-                  onPressed: () => markAsRemembered(true),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                  child: const Text('Đã nhớ'),
+                Tooltip(
+                  message: 'Đánh dấu đã nhớ',
+                  child: ElevatedButton(
+                    onPressed: () => markAsRemembered(true),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, shape:RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                    child: const Text('Đã nhớ'),
+                  ),
                 ),
                 const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: () => markAsRemembered(false),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  child: const Text('Chưa nhớ'),
+                Tooltip(
+                  message: 'Nhấn nếu cần ôn lại từ này',
+                  child: ElevatedButton(
+                    onPressed: () => markAsRemembered(false),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                    child: const Text('Chưa nhớ'),
+                  ),
                 ),
               ],
             )

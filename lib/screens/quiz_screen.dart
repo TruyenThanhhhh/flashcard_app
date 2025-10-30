@@ -52,14 +52,18 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void showQuizSummary() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Bạn đã hoàn thành quiz!')),
+    );
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Hoàn thành Quiz'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Số câu đúng: $score/${cards.length}'),
+            Text('Số câu đúng: $score/${cards.length}', style: const TextStyle(fontSize: 18)),
             const SizedBox(height:12),
             Text(score == cards.length ? 'Tuyệt vời! Bạn đạt điểm tối đa!' : 'Tiếp tục luyện tập để nâng cao nhé!'),
           ],
@@ -111,13 +115,22 @@ class _QuizScreenState extends State<QuizScreen> {
           children: [
             Text('Câu hỏi ${current+1}/${cards.length}', style: const TextStyle(fontSize: 20)),
             const SizedBox(height: 18),
-            Text(card.english, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal:16.0, vertical:20),
+                child: Text(card.english, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+              ),
+            ),
             const SizedBox(height: 30),
             ...List.generate(4, (i) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 6),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(230,50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
                   backgroundColor: showResult
                     ? (options[current][i] == card.vietnamese)
                       ? Colors.green
@@ -137,6 +150,18 @@ class _QuizScreenState extends State<QuizScreen> {
           ],
         )
         : QuizTextAnswer(card: card, show: showResult, onAnswer: textAnswer),
+      ),
+      bottomNavigationBar: BottomAppBar(
+        elevation: 1,
+        child: Container(
+          alignment: Alignment.centerRight,
+          height: 50,
+          child: TextButton.icon(
+            onPressed: ()=>Navigator.pop(context),
+            icon: const Icon(Icons.home_outlined),
+            label: const Text('Về chủ đề'),
+          ),
+        ),
       ),
     );
   }
