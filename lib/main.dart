@@ -47,7 +47,7 @@ class _FlashcardAppState extends State<FlashcardApp> {
         primarySwatch: Colors.indigo,
         brightness: Brightness.light,
         visualDensity: VisualDensity.adaptivePlatformDensity,
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: Colors.indigo[50],
           margin: const EdgeInsets.all(10),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -70,7 +70,7 @@ class _FlashcardAppState extends State<FlashcardApp> {
         primarySwatch: Colors.indigo,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.black,
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: Colors.grey[850],
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
