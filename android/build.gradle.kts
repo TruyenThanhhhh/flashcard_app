@@ -1,3 +1,15 @@
+// Khối này rất quan trọng để khai báo plugin Google Services
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // Thêm dòng này để khai báo classpath cho Google Services
+        classpath("com.google.gms:google-services:4.4.2")
+    }
+}
+
 allprojects {
     repositories {
         google()

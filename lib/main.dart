@@ -1,30 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 
-void main() {
+Future<void> main() async {
+  // Đảm bảo Flutter binding đã sẵn sàng
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Khởi tạo Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print("✅ Firebase đã khởi tạo thành công!");
+  } catch (e) {
+    print("❌ Lỗi khi khởi tạo Firebase: $e");
+  }
+
+  // Chạy ứng dụng
   runApp(const FlashcardApp());
 }
 
 class FlashcardApp extends StatefulWidget {
   const FlashcardApp({super.key});
+
   @override
   State<FlashcardApp> createState() => _FlashcardAppState();
 }
 
 class _FlashcardAppState extends State<FlashcardApp> {
   ThemeMode themeMode = ThemeMode.light;
-  void toggleTheme() => setState(() => themeMode = themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+
+  void toggleTheme() {
+    setState(() {
+      themeMode = themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Flashcard App',
+      themeMode: themeMode,
       theme: ThemeData(
         primarySwatch: Colors.indigo,
         brightness: Brightness.light,
         visualDensity: VisualDensity.adaptivePlatformDensity,
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           color: Colors.indigo[50],
           margin: const EdgeInsets.all(10),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -40,15 +63,15 @@ class _FlashcardAppState extends State<FlashcardApp> {
         ),
         snackBarTheme: const SnackBarThemeData(
           backgroundColor: Colors.indigo,
-          contentTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
-        )
+          contentTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       darkTheme: ThemeData(
         primarySwatch: Colors.indigo,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.black,
-        cardTheme: CardThemeData(
-          color: Colors.grey,
+        cardTheme: CardTheme(
+          color: Colors.grey[850],
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
         appBarTheme: const AppBarTheme(backgroundColor: Colors.black, elevation: 1),
@@ -56,9 +79,10 @@ class _FlashcardAppState extends State<FlashcardApp> {
           titleLarge: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
-      themeMode: themeMode,
-      home: HomeScreen(onToggleTheme: toggleTheme, isDark: themeMode==ThemeMode.dark),
+      home: HomeScreen(
+        onToggleTheme: toggleTheme,
+        isDark: themeMode == ThemeMode.dark,
+      ),
     );
   }
 }
-//comment để push lại
