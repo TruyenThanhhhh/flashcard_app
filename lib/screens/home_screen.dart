@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -199,6 +200,49 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Text(
         "Thống kê đang phát triển...",
         style: TextStyle(fontSize: 20),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected 
+            ? (isDark ? Color(0xFF6366F1).withOpacity(0.2) : Color(0xFF6366F1).withOpacity(0.1))
+            : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected 
+                ? Color(0xFF6366F1)
+                : (isDark ? Colors.grey[500] : Colors.grey[600]),
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Color(0xFF6366F1),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
