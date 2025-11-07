@@ -34,6 +34,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - images/StudyMateRemoveBg.png
+    - images/LogoVamos.png
+
 
   # Nếu bạn có hình ảnh hoặc dữ liệu mẫu, khai báo tại đây:
   # assets:

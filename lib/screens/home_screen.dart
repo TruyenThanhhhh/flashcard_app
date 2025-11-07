@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/category.dart';
-import '../screens/flashcards_screen.dart';
-import '../screens/learning_screen.dart';
-import '../screens/quiz_screen.dart';
-import '../data/demo_data.dart';
+import 'flashcards_screen.dart';
+import 'learning_screen.dart';
+import 'quiz_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -15,114 +15,191 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late List<Category> categories;
   int selectedTab = 0;
-  bool _showTip = true;
-  final List<Map<String,dynamic>> topicIcons = [
-    {'icon': Icons.star, 'color': Colors.deepPurpleAccent},
-    {'icon': Icons.pets, 'color': Colors.teal},
-    {'icon': Icons.forum, 'color': Colors.orangeAccent},
-  ];
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  @override
-  void initState() {
-    super.initState();
-    categories = demoCategories;
-  }
+  // Giả lập dữ liệu thống kê (có thể lấy từ Firestore user sau)
+  int studyStreak = 8;
+  int lessonsLearned = 24;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('Chủ đề từ vựng'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          "studyMate",
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
-            icon: Icon(widget.isDark ? Icons.dark_mode : Icons.light_mode, color: Colors.yellow[300]),
-            tooltip: 'Chuyển chế độ sáng/tối',
-            onPressed: widget.onToggleTheme,
+            icon: const Icon(Icons.search, color: Colors.black87),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
+            onPressed: () {},
           ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedTab,
-        onTap: (i) => setState(()=>selectedTab=i),
+        onTap: (i) => setState(() => selectedTab = i),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label:'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label:'Thống kê'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Thống kê'),
         ],
       ),
-      body: selectedTab == 0 ? Stack(
-        children: [
-          ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: categories.length,
-            itemBuilder: (context, idx) {
-              final c = categories[idx];
-              return Card(
-                elevation: 5,
-                margin: const EdgeInsets.symmetric(vertical: 9, horizontal: 2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: topicIcons[idx%topicIcons.length]['color'],
-                    child: Icon(topicIcons[idx%topicIcons.length]['icon'], color: Colors.white),
-                  ),
-                  title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${c.cards.length} flashcards'),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'learn') {
-                        Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => LearningScreen(category: c),
-                        ));
-                      } else if (value == 'manage') {
-                        Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => FlashcardsScreen(category: c),
-                        ));
-                      } else if (value == 'quiz') {
-                        Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => QuizScreen(category: c),
-                        ));
-                      }
-                    },
-                    itemBuilder: (ctx) => [
-                      const PopupMenuItem<String>(value: 'learn', child: Text('Chế độ học')), 
-                      const PopupMenuItem<String>(value: 'quiz', child: Text('Làm quiz/kiểm tra')), 
-                      const PopupMenuItem<String>(value: 'manage', child: Text('Quản lý/Cập nhật thẻ')), 
-                    ],
-                    icon: const Icon(Icons.more_vert),
-                  ),
-                  onTap: null,
-                ),
-              );
-            },
-          ),
-          if (_showTip)
-            Positioned(
-              left: 8,right:8,top:0,
-              child: Card(
-                color: Colors.amber[100],
-                elevation: 7,
-                margin: const EdgeInsets.all(12),
-                child: ListTile(
-                  leading: const Icon(Icons.info_outline, color: Colors.orange),
-                  title: const Text('Mẹo: Bấm và giữ một chủ đề để tuỳ chọn “Học, Quiz, Quản lý” hoặc chạm vào biểu tượng ☰'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close), onPressed: ()=>setState(()=>_showTip=false)),
-                ),
-              ),
-            ),
-        ],
-      ) : _StatisticsPlaceholder(),
+      body: selectedTab == 0 ? _buildHomeContent() : _buildStatistics(),
     );
   }
-}
 
-class _StatisticsPlaceholder extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildHomeContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 👤 Thông tin người dùng
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 26,
+                backgroundColor: Colors.green,
+                child: Text('B',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 24)),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Thanhh Binh',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: Icon(widget.isDark ? Icons.dark_mode : Icons.light_mode,
+                    color: Colors.orangeAccent),
+                onPressed: widget.onToggleTheme,
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // 📊 Thống kê nhanh
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildStatCard('Chuỗi ngày học', studyStreak.toString(), Colors.pink[100]!),
+              _buildStatCard('Số giờ học', lessonsLearned.toString(), Colors.green[100]!),
+            ],
+          ),
+          const SizedBox(height: 25),
+
+          // 🕓 Gần đây
+          _buildSectionHeader('Gần đây'),
+          _buildCourseCard('Minna no nihongo 3', '30 thuật ngữ', Colors.green[200]!),
+          const SizedBox(height: 18),
+
+          // 💡 Gợi ý bài học
+          _buildSectionHeader('Gợi ý bài học'),
+          _buildCourseCard('IELTS Rate 7.0 Vocab', '50 thuật ngữ', Colors.lightGreen[200]!),
+          const SizedBox(height: 18),
+
+          // 📁 Thư mục của tôi
+          _buildSectionHeader('Thư mục của tôi'),
+          _buildCourseCard('Ghi chú 1', '', Colors.lightGreen[200]!),
+
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  // 🧩 Hàm dựng khối thống kê
+  Widget _buildStatCard(String title, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            Text(value,
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(title, style: const TextStyle(color: Colors.black54)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 📘 Tiêu đề mục
+  Widget _buildSectionHeader(String title) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title,
+            style:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        TextButton(
+          onPressed: () {},
+          child: const Text('Thêm',
+              style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
+        ),
+      ],
+    );
+  }
+
+  // 🗂 Thẻ bài học
+  Widget _buildCourseCard(String title, String subtitle, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.menu_book_rounded, color: Colors.indigo, size: 34),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
+                if (subtitle.isNotEmpty)
+                  Text(subtitle, style: const TextStyle(color: Colors.black54)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 📈 Trang thống kê
+  Widget _buildStatistics() {
     return const Center(
-      child: Text('Thống kê đang phát triển...', style: TextStyle(fontSize: 20)),
+      child: Text(
+        "Thống kê đang phát triển...",
+        style: TextStyle(fontSize: 20),
+      ),
     );
   }
 }
