@@ -38,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
             children: [
               // Logo chính
               Image.asset(
-                'images/StudyMateRemoveBg.png',
+                'images/StudyMateRemoveBG.png',
                 width: 200,
               ),
               const SizedBox(height: 20),

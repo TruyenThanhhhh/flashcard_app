@@ -205,11 +205,16 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                         builder: (context, child) {
                           final isReverse = (showMeaning && flipAnim.value < 0.5) || (!showMeaning && flipAnim.value > 0.5);
                           final angle = isReverse ? flipAnim.value - 1 : flipAnim.value;
+                          final needsFlip = showMeaning && flipAnim.value > 0.5;
                           return Transform(
                             transform: Matrix4.identity()..setEntry(3, 2, 0.001)
                               ..rotateY(angle * 3.1416),
                             alignment: Alignment.center,
-                            child: child,
+                            child: Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.identity()..scale(needsFlip ? -1.0 : 1.0, 1.0, 1.0),
+                              child: child,
+                            ),
                           );
                         },
                       );
@@ -234,6 +239,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                       child: Text(
                         showMeaning ? card.vietnamese : card.english,
                         style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                        textDirection: TextDirection.ltr,
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ),
