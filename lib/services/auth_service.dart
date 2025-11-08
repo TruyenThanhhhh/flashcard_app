@@ -16,7 +16,11 @@ class AuthService {
 
   // --- ĐĂNG KÝ EMAIL/PASSWORD ---
   Future<UserCredential?> signUpWithEmail(
-      String email, String password, String name, String username) async {
+    String email,
+    String password,
+    String name,
+    String username,
+  ) async {
     try {
       final usernameQuery = await _firestore
           .collection('users')
@@ -28,15 +32,12 @@ class AuthService {
         throw 'Username này đã tồn tại. Vui lòng chọn username khác.';
       }
 
-      UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
 
       // Cập nhật profile của user trong Firebase Auth (để có displayName)
       await userCredential.user?.updateDisplayName(name);
-      
+
       // Lưu thông tin (sẽ không có photoURL lúc này)
       await _saveUserToFirestore(userCredential.user!);
       return userCredential;
@@ -50,7 +51,9 @@ class AuthService {
 
   // --- ĐĂNG NHẬP BẰNG EMAIL HOẶC USERNAME ---
   Future<UserCredential?> signInWithEmailOrUsername(
-      String loginId, String password) async {
+    String loginId,
+    String password,
+  ) async {
     try {
       String email = loginId;
 
@@ -66,14 +69,15 @@ class AuthService {
         }
         email = usernameQuery.docs.first.data()['email'];
       }
-      
+      // Đăng nhập với email đã lấy được
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-          email: email, password: password);
-      
+        email: email,
+        password: password,
+      );
+
       // Cập nhật lastLogin khi đăng nhập
       await _saveUserToFirestore(userCredential.user!);
       return userCredential;
-
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found' ||
           e.code == 'wrong-password' ||
@@ -106,7 +110,7 @@ class AuthService {
         );
         userCredential = await _auth.signInWithCredential(credential);
       }
-      
+
       if (userCredential == null || userCredential.user == null) {
         throw "Đăng nhập Google thất bại.";
       }
@@ -133,8 +137,9 @@ class AuthService {
     final docRef = _firestore.collection('users').doc(user.uid);
     final doc = await docRef.get();
 
-    String username = user.email?.split('@').first ?? 'user_${user.uid.substring(0, 6)}';
-    
+    String username =
+        user.email?.split('@').first ?? 'user_${user.uid.substring(0, 6)}';
+
     // Chỉ tạo các trường này nếu document chưa tồn tại (lần đăng ký đầu tiên)
     if (!doc.exists) {
       await docRef.set({
@@ -153,7 +158,7 @@ class AuthService {
         'setting': {
           'language': 'vi',
           'notifications': true,
-          'themeMode': 'light'
+          'themeMode': 'light',
         },
         // Thêm lastLogin khi tạo
         'lastLogin': FieldValue.serverTimestamp(),

@@ -24,11 +24,14 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       // GỌI HÀM ĐĂNG NHẬP MỚI
       await _authService.signInWithEmailOrUsername(
-          _loginIdController.text.trim(), _passwordController.text.trim());
+        _loginIdController.text.trim(),
+        _passwordController.text.trim(),
+      );
       // Đăng nhập thành công thì StreamBuilder ở main.dart sẽ tự chuyển trang
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
     if (mounted) setState(() => _isLoading = false);
   }
@@ -39,12 +42,13 @@ class _LoginScreenState extends State<LoginScreen> {
       await _authService.signInWithGoogle();
       // Tự động chuyển trang nhờ Stream ở main.dart
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Lỗi Google Sign in: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Lỗi Google Sign in: $e")));
     }
     if (mounted) setState(() => _isLoading = false);
   }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,14 +61,17 @@ class _LoginScreenState extends State<LoginScreen> {
             TextField(
               controller: _loginIdController,
               decoration: const InputDecoration(
-                  labelText: "Email hoặc Username",
-                  border: OutlineInputBorder()),
+                labelText: "Email hoặc Username",
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
               decoration: const InputDecoration(
-                  labelText: "Mật khẩu", border: OutlineInputBorder()),
+                labelText: "Mật khẩu",
+                border: OutlineInputBorder(),
+              ),
               obscureText: true,
             ),
             const SizedBox(height: 24),
@@ -75,25 +82,30 @@ class _LoginScreenState extends State<LoginScreen> {
                       ElevatedButton(
                         onPressed: _handleLogin,
                         style: ElevatedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(50)),
+                          minimumSize: const Size.fromHeight(50),
+                        ),
                         child: const Text("Đăng nhập"),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
                         onPressed: _handleGoogleLogin,
-                        icon: const Icon(Icons.login,
-                            color: Colors
-                                .red), // Bạn có thể thay icon Google xịn hơn
+                        icon: const Icon(
+                          Icons.login,
+                          color: Colors.red,
+                        ), // Bạn có thể thay icon Google xịn hơn
                         label: const Text("Đăng nhập bằng Google"),
                         style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(50)),
+                          minimumSize: const Size.fromHeight(50),
+                        ),
                       ),
                       TextButton(
                         onPressed: () {
                           Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const RegisterScreen()));
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterScreen(),
+                            ),
+                          );
                         },
                         child: const Text("Chưa có tài khoản? Đăng ký ngay"),
                       ),

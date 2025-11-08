@@ -79,7 +79,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
       });
     }
   }
-
+// Gọi API Gemini để lấy phản hồi
   Future<String> _callGeminiAPI(String userMessage) async {
   // Check if API key is set
   if (_apiKey == 'YOUR_GEMINI_API_KEY_HERE') {

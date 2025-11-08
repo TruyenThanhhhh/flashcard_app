@@ -13,7 +13,6 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onToggleTheme;
   final bool isDark;
   const HomeScreen({super.key, this.onToggleTheme, this.isDark = false});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -22,8 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int selectedTab = 0;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
-  // --- Biến State cho dữ liệu động ---
+
   String userName = "Đang tải...";
   String? userPhotoURL;
   String userEmail = "";
@@ -41,7 +39,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadCategories(); // Tải danh sách flashcard
   }
 
-  /// Tải thông tin người dùng VÀ tính toán chuỗi ngày học
   Future<void> _loadUserData() async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -80,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           // Chưa đăng nhập hôm nay -> kiểm tra xem có phải hôm qua không
           final yesterday = now.subtract(const Duration(days: 1));
-          
+
           if (DateUtils.isSameDay(lastLoginDate, yesterday)) {
             // Đăng nhập hôm qua -> Chuỗi tăng lên 1
             final newStreak = currentStreak + 1;
@@ -115,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadCategories() async {
     // ... (Hàm này giữ nguyên như cũ, không thay đổi) ...
-     try {
+    try {
       setState(() {
         isLoading = true;
         errorMessage = null;
@@ -140,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       for (final setDoc in flashcardSetsSnapshot.docs) {
         final setData = setDoc.data();
-        
+
         final flashcardsSnapshot = await setDoc.reference
             .collection('flashcards')
             .get();
@@ -149,17 +146,27 @@ class _HomeScreenState extends State<HomeScreen> {
           final cardData = cardDoc.data();
           return Flashcard(
             id: cardDoc.id,
-            english: cardData['en'] ?? cardData['english'] ?? cardData['frontText'] ?? '',
-            vietnamese: cardData['vi'] ?? cardData['vietnamese'] ?? cardData['backText'] ?? '',
+            english:
+                cardData['en'] ??
+                cardData['english'] ??
+                cardData['frontText'] ??
+                '',
+            vietnamese:
+                cardData['vi'] ??
+                cardData['vietnamese'] ??
+                cardData['backText'] ??
+                '',
             example: cardData['example'] ?? cardData['note'],
           );
         }).toList();
 
-        loadedCategories.add(Category(
-          id: setDoc.id,
-          name: setData['title'] ?? setData['name'] ?? '',
-          cards: cards,
-        ));
+        loadedCategories.add(
+          Category(
+            id: setDoc.id,
+            name: setData['title'] ?? setData['name'] ?? '',
+            cards: cards,
+          ),
+        );
       }
 
       setState(() {
@@ -206,7 +213,10 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {},
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: Colors.black87,
+            ),
             onPressed: () {},
           ),
         ],
@@ -217,7 +227,10 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: (i) => setState(() => selectedTab = i),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Thống kê'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart),
+            label: 'Thống kê',
+          ),
         ],
       ),
       body: selectedTab == 0 ? _buildHomeContent() : _buildStatistics(),
@@ -238,7 +251,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 radius: 26,
                 backgroundColor: Colors.green,
                 // Nếu có link ảnh thì dùng, nếu không thì dùng chữ cái đầu
-                backgroundImage: (userPhotoURL != null && userPhotoURL!.isNotEmpty)
+                backgroundImage:
+                    (userPhotoURL != null && userPhotoURL!.isNotEmpty)
                     ? NetworkImage(userPhotoURL!)
                     : null,
                 child: (userPhotoURL != null && userPhotoURL!.isNotEmpty)
@@ -246,21 +260,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     : Text(
                         (userName.isNotEmpty) ? userName[0].toUpperCase() : '?',
                         style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 24),
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
+                        ),
                       ),
               ),
               const SizedBox(width: 12),
               // --- TÊN ĐỘNG ---
               Text(
                 userName, // Dùng biến `userName`
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const Spacer(),
               IconButton(
-                icon: Icon(widget.isDark ? Icons.dark_mode : Icons.light_mode,
-                    color: Colors.orangeAccent),
+                icon: Icon(
+                  widget.isDark ? Icons.dark_mode : Icons.light_mode,
+                  color: Colors.orangeAccent,
+                ),
                 onPressed: widget.onToggleTheme,
               ),
             ],
@@ -271,14 +291,22 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatCard('Chuỗi ngày học', studyStreak.toString(), Colors.pink[100]!),
-              _buildStatCard('Số giờ học', totalHours.toString(), Colors.green[100]!),
+              _buildStatCard(
+                'Chuỗi ngày học',
+                studyStreak.toString(),
+                Colors.pink[100]!,
+              ),
+              _buildStatCard(
+                'Số giờ học',
+                totalHours.toString(),
+                Colors.green[100]!,
+              ),
             ],
           ),
           const SizedBox(height: 25),
 
           // ... (Phần hiển thị loading/error/danh sách giữ nguyên) ...
-           if (isLoading)
+          if (isLoading)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(32.0),
@@ -328,28 +356,41 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           else ...[
             _buildSectionHeader('Gần đây'),
-            ...categories.take(1).map((category) => _buildCourseCard(
-                  category,
-                  '${category.cards.length} thuật ngữ',
-                  Colors.green[200]!,
-                )),
+            ...categories
+                .take(1)
+                .map(
+                  (category) => _buildCourseCard(
+                    category,
+                    '${category.cards.length} thuật ngữ',
+                    Colors.green[200]!,
+                  ),
+                ),
             const SizedBox(height: 18),
             if (categories.length > 1) ...[
               _buildSectionHeader('Gợi ý bài học'),
-              ...categories.skip(1).take(1).map((category) => _buildCourseCard(
-                    category,
-                    '${category.cards.length} thuật ngữ',
-                    Colors.lightGreen[200]!,
-                  )),
+              ...categories
+                  .skip(1)
+                  .take(1)
+                  .map(
+                    (category) => _buildCourseCard(
+                      category,
+                      '${category.cards.length} thuật ngữ',
+                      Colors.lightGreen[200]!,
+                    ),
+                  ),
               const SizedBox(height: 18),
             ],
             if (categories.length > 2) ...[
               _buildSectionHeader('Thư mục của tôi'),
-              ...categories.skip(2).map((category) => _buildCourseCard(
-                    category,
-                    '${category.cards.length} thuật ngữ',
-                    Colors.lightGreen[200]!,
-                  )),
+              ...categories
+                  .skip(2)
+                  .map(
+                    (category) => _buildCourseCard(
+                      category,
+                      '${category.cards.length} thuật ngữ',
+                      Colors.lightGreen[200]!,
+                    ),
+                  ),
             ],
           ],
 
@@ -371,9 +412,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Column(
           children: [
-            Text(value,
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 4),
             Text(title, style: const TextStyle(color: Colors.black54)),
           ],
@@ -381,23 +423,26 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-  
+
   Widget _buildSectionHeader(String title) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title,
-            style:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         TextButton(
           onPressed: () {},
-          child: const Text('Thêm',
-              style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
+          child: const Text(
+            'Thêm',
+            style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );
   }
-  
+
   Widget _buildCourseCard(Category category, String subtitle, Color color) {
     return InkWell(
       onTap: () => _showCategoryOptions(context, category),
@@ -417,11 +462,18 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(category.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(
+                    category.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                   if (subtitle.isNotEmpty)
-                    Text(subtitle, style: const TextStyle(color: Colors.black54)),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
                 ],
               ),
             ),
@@ -470,10 +522,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 8),
                 Text(
                   '${category.cards.length} flashcard',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 24),
                 _buildOptionTile(
@@ -487,7 +536,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => FlashcardsScreen(category: category),
+                        builder: (context) =>
+                            FlashcardsScreen(category: category),
                       ),
                     );
                   },
@@ -504,7 +554,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => LearningScreen(category: category),
+                        builder: (context) =>
+                            LearningScreen(category: category),
                       ),
                     );
                   },
@@ -579,10 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -625,13 +673,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
-                  backgroundImage: (userPhotoURL != null && userPhotoURL!.isNotEmpty)
+                  backgroundImage:
+                      (userPhotoURL != null && userPhotoURL!.isNotEmpty)
                       ? NetworkImage(userPhotoURL!)
                       : null,
                   child: (userPhotoURL != null && userPhotoURL!.isNotEmpty)
                       ? null
                       : Text(
-                          (userName.isNotEmpty) ? userName[0].toUpperCase() : '?',
+                          (userName.isNotEmpty)
+                              ? userName[0].toUpperCase()
+                              : '?',
                           style: const TextStyle(
                             color: Colors.indigo,
                             fontSize: 32,
@@ -679,7 +730,9 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const AIAssistantScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const AIAssistantScreen(),
+                ),
               );
             },
           ),
@@ -725,7 +778,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text('Đăng xuất', style: TextStyle(color: Colors.redAccent)),
+            title: const Text(
+              'Đăng xuất',
+              style: TextStyle(color: Colors.redAccent),
+            ),
             onTap: () {
               Navigator.pop(context);
               authService.signOut();
