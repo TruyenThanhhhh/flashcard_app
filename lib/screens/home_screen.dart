@@ -143,7 +143,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 📘 Tiêu đề mục
   Widget _buildSectionHeader(String title) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -160,7 +159,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 🗂 Thẻ bài học
   Widget _buildCourseCard(String title, String subtitle, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -194,7 +192,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 📈 Trang thống kê
   Widget _buildStatistics() {
     return const Center(
       child: Text(
