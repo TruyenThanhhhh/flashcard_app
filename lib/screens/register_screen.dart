@@ -98,3 +98,4 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
+//new register
