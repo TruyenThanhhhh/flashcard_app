@@ -19,7 +19,7 @@ class _QuizScreenState extends State<QuizScreen> {
   List<int> questionOrder = [];
   List<List<String>> options = [];
   final rng = UniqueKey();
-
+  // Chuẩn bị dữ liệu quiz khi khởi tạo
   @override
   void initState() {
     super.initState();
