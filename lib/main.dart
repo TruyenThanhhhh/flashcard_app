@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'firebase_options.dart';
-import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
-import 'screens/login_screen.dart'; // Import Login Screen
-import 'services/auth_service.dart'; // Import Auth Service
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,9 +27,6 @@ class FlashcardApp extends StatefulWidget {
 class _FlashcardAppState extends State<FlashcardApp> {
   ThemeMode themeMode = ThemeMode.light;
 
-  // Thêm một Future để giả lập thời gian chờ của Splash Screen
-  final Future<void> _splashScreenDelay = Future.delayed(const Duration(seconds: 3));
-
   void toggleTheme() {
     setState(() {
       themeMode =
@@ -48,7 +41,6 @@ class _FlashcardAppState extends State<FlashcardApp> {
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
 
-      // --- Theme và DarkTheme của bạn giữ nguyên ---
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         brightness: Brightness.light,
@@ -114,51 +106,7 @@ class _FlashcardAppState extends State<FlashcardApp> {
               TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
-      // --- HẾT PHẦN THEME ---
-
-      // Sửa đổi 'home' để điều hướng logic
-      home: FutureBuilder(
-        future: _splashScreenDelay,
-        builder: (context, snapshot) {
-          // Khi Future đang chạy (đang chờ 3s), hiển thị SplashScreen
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SplashScreen();
-          }
-
-          // Khi Future hoàn thành (đã chờ 3s), hiển thị AuthWrapper
-          // AuthWrapper sẽ tự quyết định vào Login hay Home
-          return const AuthWrapper();
-        },
-      ),
-    );
-  }
-}
-
-// Widget mới để kiểm tra trạng thái đăng nhập
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // Dùng StreamBuilder để lắng nghe thay đổi trạng thái đăng nhập
-    return StreamBuilder<User?>(
-      stream: AuthService().authStateChanges, // Lấy stream từ AuthService
-      builder: (context, snapshot) {
-        // Đang chờ kết nối (ví dụ: đang lấy token)
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        // Đã có dữ liệu
-        if (snapshot.hasData) {
-          // Nếu snapshot.data có dữ liệu (User), nghĩa là đã đăng nhập
-          return const HomeScreen();
-        }
-
-        return const LoginScreen();
-      },
+      home: const SplashScreen(),
     );
   }
 }

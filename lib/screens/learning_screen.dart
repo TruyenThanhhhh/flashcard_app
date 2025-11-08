@@ -406,6 +406,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
               letterSpacing: -0.5,
             ),
             textAlign: TextAlign.center,
+            textDirection: TextDirection.ltr,
           ),
           const Spacer(),
           Container(
@@ -469,6 +470,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
               letterSpacing: -0.5,
             ),
             textAlign: TextAlign.center,
+            textDirection: TextDirection.ltr,
           ),
           const Spacer(),
           Container(
