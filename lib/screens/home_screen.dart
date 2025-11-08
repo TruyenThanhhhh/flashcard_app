@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/category.dart';
-import '../models/flashcart.dart'; // Đảm bảo tên file model là 'flashcart.dart' hoặc 'flashcard.dart'
+import '../models/flashcart.dart';
 import 'flashcards_screen.dart';
 import 'learning_screen.dart';
 import 'quiz_screen.dart';
 import 'ai_assistant_screen.dart';
-// THÊM IMPORT ĐỂ SỬ DỤNG AUTHSERVICE
 import '../services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,11 +23,13 @@ class _HomeScreenState extends State<HomeScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   
-  // User stats from Firestore
+  // --- Biến State cho dữ liệu động ---
+  String userName = "Đang tải...";
+  String? userPhotoURL;
+  String userEmail = "";
   int studyStreak = 0;
-  int lessonsLearned = 0;
+  int totalHours = 0;
 
-  // Categories from Firestore
   List<Category> categories = [];
   bool isLoading = true;
   String? errorMessage;
@@ -36,34 +37,85 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Khi màn hình khởi động, tải cả hai
-    _loadUserStats();
-    _loadCategories();
+    _loadUserData(); // Tải dữ liệu người dùng VÀ tính chuỗi ngày
+    _loadCategories(); // Tải danh sách flashcard
   }
 
-  // Hàm này lấy thông tin thống kê từ /users/{userId}
-  Future<void> _loadUserStats() async {
+  /// Tải thông tin người dùng VÀ tính toán chuỗi ngày học
+  Future<void> _loadUserData() async {
     final user = _auth.currentUser;
     if (user == null) return;
 
     try {
-      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final userDocRef = _db.collection('users').doc(user.uid);
+      final userDoc = await userDocRef.get();
+
       if (userDoc.exists) {
-        final data = userDoc.data();
-        final stats = data?['stats'] as Map<String, dynamic>? ?? {};
+        final data = userDoc.data()!;
+        final stats = data['stats'] as Map<String, dynamic>? ?? {};
+
+        // --- 1. CẬP NHẬT TÊN VÀ AVATAR ---
         setState(() {
-          studyStreak = stats['streak'] as int? ?? 0;
-          lessonsLearned = stats['totalHours'] as int? ?? 0;
+          userName = data['name'] as String? ?? 'No Name';
+          userPhotoURL = data['photoURL'] as String?;
+          userEmail = data['email'] as String? ?? '';
+          totalHours = stats['totalHours'] as int? ?? 0;
         });
+
+        // --- 2. LOGIC TÍNH CHUỖI NGÀY HỌC ---
+        final lastLoginTimestamp = data['lastLogin'] as Timestamp?;
+        if (lastLoginTimestamp == null) return; // Bỏ qua nếu không có lastLogin
+
+        final lastLoginDate = lastLoginTimestamp.toDate();
+        final now = DateTime.now();
+
+        final currentStreak = stats['streak'] as int? ?? 0;
+
+        // Dùng DateUtils để so sánh ngày (bỏ qua giờ, phút, giây)
+        if (DateUtils.isSameDay(lastLoginDate, now)) {
+          // Đã đăng nhập hôm nay -> không làm gì cả, giữ nguyên chuỗi
+          setState(() {
+            studyStreak = currentStreak;
+          });
+        } else {
+          // Chưa đăng nhập hôm nay -> kiểm tra xem có phải hôm qua không
+          final yesterday = now.subtract(const Duration(days: 1));
+          
+          if (DateUtils.isSameDay(lastLoginDate, yesterday)) {
+            // Đăng nhập hôm qua -> Chuỗi tăng lên 1
+            final newStreak = currentStreak + 1;
+            setState(() {
+              studyStreak = newStreak;
+            });
+            // Cập nhật streak VÀ lastLogin lên Firestore
+            await userDocRef.update({
+              'stats.streak': newStreak,
+              'lastLogin': FieldValue.serverTimestamp(),
+            });
+          } else {
+            // Bị ngắt chuỗi -> Đặt lại chuỗi = 1 (cho ngày hôm nay)
+            setState(() {
+              studyStreak = 1;
+            });
+            // Cập nhật streak = 1 VÀ lastLogin lên Firestore
+            await userDocRef.update({
+              'stats.streak': 1,
+              'lastLogin': FieldValue.serverTimestamp(),
+            });
+          }
+        }
       }
     } catch (e) {
-      print('Error loading user stats: $e');
+      print('Lỗi khi tải dữ liệu người dùng: $e');
+      setState(() {
+        userName = "Lỗi tải tên";
+      });
     }
   }
 
-  // Hàm này lấy danh sách các bộ flashcard từ /users/{userId}/flashcard_sets
   Future<void> _loadCategories() async {
-    try {
+    // ... (Hàm này giữ nguyên như cũ, không thay đổi) ...
+     try {
       setState(() {
         isLoading = true;
         errorMessage = null;
@@ -78,7 +130,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Fetch flashcard_sets from users/{userId}/flashcard_sets
       final flashcardSetsSnapshot = await _db
           .collection('users')
           .doc(user.uid)
@@ -87,21 +138,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final loadedCategories = <Category>[];
 
-      // Với mỗi bộ (set), tải các thẻ (card) bên trong nó
       for (final setDoc in flashcardSetsSnapshot.docs) {
         final setData = setDoc.data();
         
-        // Fetch flashcards from the sub-collection
         final flashcardsSnapshot = await setDoc.reference
             .collection('flashcards')
             .get();
 
-        // Chuyển đổi dữ liệu thô (raw data) sang
-        // đối tượng Flashcard
         final cards = flashcardsSnapshot.docs.map((cardDoc) {
           final cardData = cardDoc.data();
-          // Đảm bảo các key ('en', 'vi') khớp với CSDL của bạn
-          // Hoặc đổi thành 'frontText', 'backText' nếu bạn theo thiết kế CSDL mới
           return Flashcard(
             id: cardDoc.id,
             english: cardData['en'] ?? cardData['english'] ?? cardData['frontText'] ?? '',
@@ -110,8 +155,6 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }).toList();
 
-        // Chuyển đổi dữ liệu thô (raw data) sang
-        // đối tượng Category
         loadedCategories.add(Category(
           id: setDoc.id,
           name: setData['title'] ?? setData['name'] ?? '',
@@ -136,9 +179,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      drawer: _buildDrawer(context, isDark), // Drawer (hamburger menu)
+      drawer: _buildDrawer(context, isDark),
       appBar: AppBar(
-        // ... (Code AppBar giữ nguyên) ...
+        // ... (Giữ nguyên AppBar) ...
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: Builder(
@@ -169,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        // ... (Code BottomNavigationBar giữ nguyên) ...
+        // ... (Giữ nguyên BottomNavigationBar) ...
         currentIndex: selectedTab,
         onTap: (i) => setState(() => selectedTab = i),
         items: const [
@@ -177,35 +220,42 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Thống kê'),
         ],
       ),
-      // Body sẽ hiển thị nội dung chính
       body: selectedTab == 0 ? _buildHomeContent() : _buildStatistics(),
     );
   }
 
-  // Widget này xây dựng nội dung chính của trang chủ
   Widget _buildHomeContent() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 👤 Thông tin người dùng
+          // --- 👤 Thông tin người dùng (ĐÃ CẬP NHẬT) ---
           Row(
-            // ... (Code Row thông tin user giữ nguyên) ...
             children: [
-              const CircleAvatar(
+              // --- AVATAR ĐỘNG ---
+              CircleAvatar(
                 radius: 26,
                 backgroundColor: Colors.green,
-                child: Text('B',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24)),
+                // Nếu có link ảnh thì dùng, nếu không thì dùng chữ cái đầu
+                backgroundImage: (userPhotoURL != null && userPhotoURL!.isNotEmpty)
+                    ? NetworkImage(userPhotoURL!)
+                    : null,
+                child: (userPhotoURL != null && userPhotoURL!.isNotEmpty)
+                    ? null
+                    : Text(
+                        (userName.isNotEmpty) ? userName[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 24),
+                      ),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Thanhh Binh',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              // --- TÊN ĐỘNG ---
+              Text(
+                userName, // Dùng biến `userName`
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const Spacer(),
               IconButton(
@@ -217,29 +267,24 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 20),
 
-          // 📊 Thống kê nhanh
+          // --- 📊 Thống kê nhanh (ĐÃ CẬP NHẬT) ---
           Row(
-            // ... (Code Row thống kê giữ nguyên) ...
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildStatCard('Chuỗi ngày học', studyStreak.toString(), Colors.pink[100]!),
-              _buildStatCard('Số giờ học', lessonsLearned.toString(), Colors.green[100]!),
+              _buildStatCard('Số giờ học', totalHours.toString(), Colors.green[100]!),
             ],
           ),
           const SizedBox(height: 25),
 
-          // ----------------------------------------------------
-          // 💡 PHẦN HIỂN THỊ DỮ LIỆU TỪ FIREBASE
-          // ----------------------------------------------------
-          // Hiển thị vòng quay loading
-          if (isLoading)
+          // ... (Phần hiển thị loading/error/danh sách giữ nguyên) ...
+           if (isLoading)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(32.0),
                 child: CircularProgressIndicator(),
               ),
             )
-          // Hiển thị lỗi nếu có
           else if (errorMessage != null)
             Center(
               child: Padding(
@@ -253,14 +298,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: _loadCategories, // Nút thử lại
+                      onPressed: _loadCategories,
                       child: const Text('Thử lại'),
                     ),
                   ],
                 ),
               ),
             )
-          // Hiển thị "Chưa có chủ đề nào" (như ảnh image_e85943.png)
           else if (categories.isEmpty)
             Center(
               child: Padding(
@@ -282,22 +326,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             )
-          // Hiển thị danh sách các bộ flashcard (khi có dữ liệu)
           else ...[
-            // 🕓 Gần đây
             _buildSectionHeader('Gần đây'),
-            // Lấy 1 bộ
             ...categories.take(1).map((category) => _buildCourseCard(
                   category,
                   '${category.cards.length} thuật ngữ',
                   Colors.green[200]!,
                 )),
             const SizedBox(height: 18),
-
-            // 💡 Gợi ý bài học
             if (categories.length > 1) ...[
               _buildSectionHeader('Gợi ý bài học'),
-              // Bỏ 1, lấy 1 bộ tiếp theo
               ...categories.skip(1).take(1).map((category) => _buildCourseCard(
                     category,
                     '${category.cards.length} thuật ngữ',
@@ -305,11 +343,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   )),
               const SizedBox(height: 18),
             ],
-
-            // 📁 Thư mục của tôi
             if (categories.length > 2) ...[
               _buildSectionHeader('Thư mục của tôi'),
-              // Bỏ 2, lấy tất cả còn lại
               ...categories.skip(2).map((category) => _buildCourseCard(
                     category,
                     '${category.cards.length} thuật ngữ',
@@ -324,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ... (Các hàm _buildStatCard, _buildSectionHeader, _buildCourseCard giữ nguyên) ...
+  // ... (Các hàm _buildStatCard, _buildSectionHeader, _buildCourseCard, _showCategoryOptions, _buildOptionTile, _buildStatistics giữ nguyên) ...
   Widget _buildStatCard(String title, String value, Color color) {
     return Expanded(
       child: Container(
@@ -400,7 +435,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ... (Hàm _showCategoryOptions giữ nguyên) ...
   void _showCategoryOptions(BuildContext context, Category category) {
     showModalBottomSheet(
       context: context,
@@ -501,7 +535,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ... (Hàm _buildOptionTile giữ nguyên) ...
   Widget _buildOptionTile(
     BuildContext context, {
     required IconData icon,
@@ -540,14 +573,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: color, // Màu chữ trùng với màu icon
+                      color: color,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 14, // Cỡ chữ subtitle
+                      fontSize: 14,
                       color: Colors.grey[600],
                     ),
                   ),
@@ -561,7 +594,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 📈 Trang thống kê
   Widget _buildStatistics() {
     return const Center(
       child: Text(
@@ -571,11 +603,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ----------------------------------------------------
-  // 💡 HÀM BUILD DRAWER (ĐÃ THÊM NÚT ĐĂNG XUẤT)
-  // ----------------------------------------------------
+  // --- Drawer menu (ĐÃ CẬP NHẬT) ---
   Widget _buildDrawer(BuildContext context, bool isDark) {
-    // Khởi tạo AuthService để gọi hàm signOut
     final authService = AuthService();
 
     return Drawer(
@@ -583,7 +612,6 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
-            // ... (Code DrawerHeader giữ nguyên) ...
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [Colors.indigo, Colors.indigo.shade700],
@@ -593,31 +621,38 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                const CircleAvatar(
+                // --- AVATAR ĐỘNG TRONG DRAWER ---
+                CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
-                  child: Text(
-                    'B',
-                    style: TextStyle(
-                      color: Colors.indigo,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  backgroundImage: (userPhotoURL != null && userPhotoURL!.isNotEmpty)
+                      ? NetworkImage(userPhotoURL!)
+                      : null,
+                  child: (userPhotoURL != null && userPhotoURL!.isNotEmpty)
+                      ? null
+                      : Text(
+                          (userName.isNotEmpty) ? userName[0].toUpperCase() : '?',
+                          style: const TextStyle(
+                            color: Colors.indigo,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'Thanhh Binh',
-                  style: TextStyle(
+                // --- TÊN ĐỘNG TRONG DRAWER ---
+                Text(
+                  userName,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 4),
+                // --- EMAIL ĐỘNG TRONG DRAWER ---
                 Text(
-                  // Lấy email của user đang đăng nhập
-                  _auth.currentUser?.email ?? 'thanhhbinh@example.com',
+                  userEmail,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
                     fontSize: 14,
@@ -626,6 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+          // ... (Các ListTile khác giữ nguyên) ...
           ListTile(
             leading: const Icon(Icons.home, color: Colors.indigo),
             title: const Text('Trang chủ'),
@@ -685,20 +721,14 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.pop(context);
             },
           ),
-          // ----------------------------------------------------
-          // 💡 ĐÃ THÊM NÚT ĐĂNG XUẤT
-          // ----------------------------------------------------
+          // Nút đăng xuất (đã có từ lần trước)
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
             title: const Text('Đăng xuất', style: TextStyle(color: Colors.redAccent)),
             onTap: () {
-              // 1. Đóng menu
               Navigator.pop(context);
-              // 2. Gọi hàm signOut từ AuthService
               authService.signOut();
-              // StreamBuilder trong main.dart sẽ tự động bắt
-              // và chuyển về màn hình Login
             },
           ),
         ],

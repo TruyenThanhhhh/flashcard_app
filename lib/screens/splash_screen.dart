@@ -13,8 +13,6 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-
-    // Chờ 3 giây rồi chuyển sang HomeScreen
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
         Navigator.pushReplacement(
@@ -36,25 +34,22 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo chính
               Image.asset(
                 'images/StudyMateRemoveBG.png',
                 width: 200,
               ),
               const SizedBox(height: 20),
 
-              // Chữ "from"
-              const Text(
+              Text(
                 'from',
                 style: TextStyle(
                   fontFamily: 'Roboto',
-                  fontSize: 18,
-                  color: Colors.grey,
+                  fontSize: 15,
+                  color: Colors.grey.withOpacity(0.6)
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
 
-              // Logo nhóm / thương hiệu
               Image.asset(
                 'images/LogoVamos.png',
                 width: 130,
