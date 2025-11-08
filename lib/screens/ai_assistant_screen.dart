@@ -15,7 +15,6 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
 
-  // Gemini API key - Người dùng cần thay thế bằng key của mình
   final String _apiKey = 'AIzaSyB5MrC1o0EZlwOFdfQ2VtAMr2_7Y7-c3Zs';
 
   @override
@@ -65,7 +64,6 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         );
         _isLoading = false;
       });
-
       _scrollToBottom();
     } catch (e) {
       setState(() {
@@ -83,21 +81,20 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
   }
 
   Future<String> _callGeminiAPI(String userMessage) async {
-    // Check if API key is set
-    if (_apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
-      return 'Vui lòng cấu hình Gemini API Key trong code.\n\n'
-          'Hướng dẫn:\n'
-          '1. Truy cập: https://makersuite.google.com/app/apikey\n'
-          '2. Tạo API key miễn phí\n'
-          '3. Thay thế _apiKey trong AIAssistantScreen';
-    }
+  // Check if API key is set
+  if (_apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
+    return 'Vui lòng cấu hình Gemini API Key trong code.\n\n'
+        'Hướng dẫn:\n'
+        '1. Truy cập: https://aistudio.google.com/app/apikey\n'
+        '2. Tạo API key miễn phí\n'
+        '3. Thay thế _apiKey trong AIAssistantScreen';
+  }
 
-    final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$_apiKey',
-    );
+  final url = Uri.parse(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$_apiKey',
+  );
 
-    final systemPrompt =
-        '''Bạn là một trợ lý AI chuyên về học ngoại ngữ, đặc biệt là tiếng Anh.
+  final systemPrompt = '''Bạn là một trợ lý AI chuyên về học ngoại ngữ, đặc biệt là tiếng Anh.
 Nhiệm vụ của bạn:
 - Giải thích ngữ pháp một cách dễ hiểu
 - Gợi ý từ vựng phù hợp với trình độ
@@ -108,30 +105,35 @@ Nhiệm vụ của bạn:
 - Đưa ra lời khuyên học tập hiệu quả
 - Sử dụng emoji để làm cho câu trả lời sinh động hơn''';
 
-    final body = json.encode({
-      'contents': [
-        {
-          'parts': [
-            {'text': '$systemPrompt\n\nCâu hỏi của học sinh: $userMessage'},
-          ],
-        },
-      ],
-      'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 1024},
-    });
-
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['candidates'][0]['content']['parts'][0]['text'];
-    } else {
-      throw Exception('API Error: ${response.statusCode} - ${response.body}');
+  final body = json.encode({
+    'contents': [
+      {
+        'parts': [
+          {'text': '$systemPrompt\n\nCâu hỏi của học sinh: $userMessage'}
+        ]
+      }
+    ],
+    'generationConfig': {
+      'temperature': 0.7,
+      'maxOutputTokens': 1024,
     }
+  });
+
+  final response = await http.post(
+    url,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: body,
+  );
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    return data['candidates'][0]['content']['parts'][0]['text'];
+  } else {
+    throw Exception('API Error: ${response.statusCode} - ${response.body}');
   }
+}
 
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
