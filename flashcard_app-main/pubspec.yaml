@@ -1,21 +1,19 @@
 name: flashcard_app
 description: "A flashcard learning app using Firebase Firestore and Authentication."
-publish_to: 'none'
+publish_to: 'none' # Không public lên pub.dev
 
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.5.4 # Lưu ý: Kiểm tra lại phiên bản SDK phù hợp với máy bạn, 3.9.2 có vẻ quá mới hoặc không đúng.
+  sdk: ^3.9.2
+  
 
 dependencies:
   flutter:
     sdk: flutter
 
-  # Firebase
-  firebase_core: ^3.6.0       # Đã cập nhật lên bản mới ổn định
-  firebase_auth: ^5.3.1       # Đã cập nhật lên bản mới ổn định
-  cloud_firestore: ^5.4.4     # Đã cập nhật lên bản mới ổn định
-  google_sign_in: ^6.2.1      # Thêm version cụ thể cho chắc chắn
+  # Firebase core để khởi tạo ứng dụng
+  firebase_core: ^4.2.0
 
   # Firebase Authentication để đăng nhập/đăng ký người dùng
   firebase_auth: ^6.1.1
@@ -26,15 +24,24 @@ dependencies:
 
   # UUID để tạo ID duy nhất cho flashcard
   uuid: ^4.5.1
+
+  # Icon iOS style
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+
+  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true
   assets:
-    - images/StudyMateRemoveBg.png
+    - images/StudyMateRemoveBG.png
     - images/LogoVamos.png
+
+
+  # Nếu bạn có hình ảnh hoặc dữ liệu mẫu, khai báo tại đây:
+  # assets:
+  #   - assets/images/
+  #   - assets/data/
