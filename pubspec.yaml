@@ -20,6 +20,7 @@ dependencies:
 
   # Cloud Firestore để lưu trữ dữ liệu flashcard
   cloud_firestore: ^6.0.3
+  google_sign_in: ^6.2.1
   http: ^1.2.0 
 
   # UUID để tạo ID duy nhất cho flashcard
@@ -39,9 +40,3 @@ flutter:
   assets:
     - images/StudyMateRemoveBG.png
     - images/LogoVamos.png
-
-
-  # Nếu bạn có hình ảnh hoặc dữ liệu mẫu, khai báo tại đây:
-  # assets:
-  #   - assets/images/
-  #   - assets/data/
