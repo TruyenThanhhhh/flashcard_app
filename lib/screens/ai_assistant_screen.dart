@@ -64,7 +64,6 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         );
         _isLoading = false;
       });
-
       _scrollToBottom();
     } catch (e) {
       setState(() {
