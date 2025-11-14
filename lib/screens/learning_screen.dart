@@ -1,30 +1,39 @@
+// lib/screens/learning_screen.dart
+
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../models/category.dart';
+// SỬA: Dùng model mới
+import '../models/flashcard_set.dart';
 import '../models/flashcard.dart';
-import '../services/firestore_service.dart'; // SỬA: Dùng FirestoreService
-import '../services/auth_service.dart'; // SỬA: Dùng AuthService
+import '../services/firestore_service.dart';
+import '../services/auth_service.dart'; // Dù không gọi, giữ lại vẫn tốt
 
 class LearningScreen extends StatefulWidget {
-  final Category category;
-  const LearningScreen({super.key, required this.category});
+  // SỬA: Nhận vào FlashcardSet
+  final FlashcardSet set; 
+  const LearningScreen({super.key, required this.set});
 
   @override
   State<LearningScreen> createState() => _LearningScreenState();
 }
 
 class _LearningScreenState extends State<LearningScreen> with TickerProviderStateMixin {
-  late List<Flashcard> cards;
+  // SỬA: Khởi tạo service
+  final FirestoreService _db = FirestoreService();
+  
+  // MỚI: State cho FutureBuilder
+  late Future<List<Flashcard>> _cardsFuture;
+
+  // SỬA: Các biến này sẽ được khởi tạo SAU KHI Future hoàn thành
+  List<Flashcard> cards = [];
   late List<bool> rememberedCards;
+  
   int index = 0;
   bool showAnswer = false;
   bool showTip = true;
   DateTime? _sessionStartTime;
-  
-  // SỬA: Khởi tạo các service
-  final FirestoreService _db = FirestoreService();
-  final AuthService _auth = AuthService();
-  
+  bool _isSessionInitialized = false; // Flag để tránh khởi tạo lại
+
   late AnimationController _flipController;
   late AnimationController _progressController;
   late Animation<double> _flipAnimation;
@@ -33,8 +42,12 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
   void initState() {
     super.initState();
     _sessionStartTime = DateTime.now();
-    cards = [...widget.category.cards];
-    rememberedCards = List.filled(cards.length, false);
+    
+    // MỚI: Bắt đầu tải thẻ ngay lập tức
+    _cardsFuture = _db.getFlashcardsOnce(widget.set.id); // Dùng hàm mới
+
+    // BỎ: Khởi tạo 'cards' ở đây
+    // cards = [...widget.category.cards];
     
     _flipController = AnimationController(
       vsync: this,
@@ -50,7 +63,8 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
       CurvedAnimation(parent: _flipController, curve: Curves.easeInOutCubic),
     );
     
-    _progressController.forward();
+    // BỎ: _progressController.forward();
+    // Sẽ forward() sau khi FutureBuilder tải xong
   }
 
   @override
@@ -61,6 +75,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
   }
 
   void _toggleCard() {
+    // ... (Giữ nguyên logic)
     setState(() {
       showAnswer = !showAnswer;
       showTip = false;
@@ -74,6 +89,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
   }
 
   void markAsRemembered(bool remembered) {
+    // ... (Giữ nguyên logic)
     setState(() {
       rememberedCards[index] = remembered;
       
@@ -89,26 +105,23 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
     });
   }
 
-  // SỬA: Hàm này để gọi service
   Future<void> _showCompletionDialog() async {
+    // ... (Giữ nguyên logic, SỬA tên biến)
     final remembered = rememberedCards.where((e) => e).length;
     final total = cards.length;
     final percentage = (total == 0) ? 0 : (remembered / total * 100).toInt();
     
-    // Record the learning session
     if (_sessionStartTime != null) {
       final duration = DateTime.now().difference(_sessionStartTime!);
-      // Không cần check _auth.currentUser nữa vì service đã làm
       try {
         await _db.recordLearningSession(
-          categoryId: widget.category.id,
-          categoryName: widget.category.name,
+          categoryId: widget.set.id, // SỬA
+          categoryName: widget.set.title, // SỬA
           duration: duration,
           cardsLearned: remembered,
         );
       } catch (e) {
         print("Lỗi khi lưu buổi học: $e");
-        // Có thể hiện SnackBar lỗi
       }
     }
     
@@ -122,6 +135,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ... (Icon)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -133,6 +147,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
                 child: Icon(Icons.emoji_events, color: Colors.white, size: 48),
               ),
               const SizedBox(height: 24),
+              // ... (Title)
               Text(
                 'Hoàn thành!',
                 style: TextStyle(
@@ -142,11 +157,12 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
               ),
               const SizedBox(height: 12),
               Text(
-                'Bạn đã học xong ${widget.category.name}',
+                'Bạn đã học xong ${widget.set.title}', // SỬA
                 style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
+              // ... (Stats box)
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -171,6 +187,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
                 ),
               ),
               const SizedBox(height: 24),
+              // ... (Button)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -199,13 +216,59 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    if (cards.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: Text(widget.category.name)),
-        body: const Center(child: Text('Chủ đề chưa có flashcard.')),
-      );
-    }
-    
+    // SỬA: Dùng FutureBuilder
+    return FutureBuilder<List<Flashcard>>(
+      future: _cardsFuture,
+      builder: (context, snapshot) {
+        // 1. Đang tải
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(title: Text(widget.set.title)),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // 2. Bị lỗi
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: Text(widget.set.title)),
+            body: Center(child: Text('Lỗi tải thẻ: ${snapshot.error}')),
+          );
+        }
+
+        // 3. Tải xong, không có thẻ
+        final loadedCards = snapshot.data ?? [];
+        if (loadedCards.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: Text(widget.set.title)),
+            body: const Center(child: Text('Chủ đề chưa có flashcard.')),
+          );
+        }
+
+        // 4. MỚI: Khởi tạo state của phiên học (chỉ 1 lần)
+        if (!_isSessionInitialized) {
+          cards = loadedCards;
+          rememberedCards = List.filled(cards.length, false);
+          _progressController.forward(); // Bắt đầu animation
+          _isSessionInitialized = true;
+        }
+
+        // 5. Build UI chính
+        // (Kiểm tra lại phòng trường hợp state chưa kịp build)
+        if (cards.isEmpty) {
+           return Scaffold(
+            appBar: AppBar(title: Text(widget.set.title)),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return _buildLearningUI(context);
+      },
+    );
+  }
+
+  // MỚI: Tách UI chính ra
+  Widget _buildLearningUI(BuildContext context) {
     final card = cards[index];
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -245,7 +308,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.category.name,
+                  widget.set.title, // SỬA
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -283,6 +346,11 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
     );
   }
 
+  // ... (Tất cả các hàm _build... khác đều giữ nguyên) ...
+  // ... (_buildProgressBar, _buildTipCard, _buildFlashcard, _buildCardFront, _buildCardBack, _buildActionButtons) ...
+  
+  // (Copy y hệt các hàm build UI phụ trợ từ file gốc của bạn)
+  
   Widget _buildProgressBar(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),

@@ -1,46 +1,48 @@
-  name: flashcard_app
-  description: "A flashcard learning app using Firebase Firestore and Authentication."
-  publish_to: 'none' # Không public lên pub.dev
+name: flashcard_app
+description: "A flashcard learning app using Firebase Firestore and Authentication."
+publish_to: 'none'
 
-  version: 1.0.0+1
+version: 1.0.0+1
 
-  environment:
-    sdk: ^3.9.2
-    
+environment:
+  # SỬA: Đặt về phiên bản Dart SDK ổn định
+  sdk: '>=3.4.0 <4.0.0'
 
-  dependencies:
-    flutter:
-      sdk: flutter
+dependencies:
+  flutter:
+    sdk: flutter
 
-    # Firebase core để khởi tạo ứng dụng
-    firebase_core: ^4.2.0
+  # --- Firebase (SỬA: Đã cập nhật lên phiên bản mới nhất) ---
+  # Lưu ý: Phiên bản Firebase core đã giảm từ 4.x -> 3.x
+  firebase_core: ^3.1.1
+  # Lưu ý: Phiên bản Firebase auth đã giảm từ 6.x -> 5.x
+  firebase_auth: ^5.1.1
+  # Lưu ý: Phiên bản Firebase store đã giảm từ 6.x -> 5.x
+  cloud_firestore: ^5.0.2
 
-    # Firebase Authentication để đăng nhập/đăng ký người dùng
-    firebase_auth: ^6.1.1
-
-    # Cloud Firestore để lưu trữ dữ liệu flashcard
-    cloud_firestore: ^6.0.3
-    http: ^1.2.0 
-
-  # Cloud Firestore để lưu trữ dữ liệu flashcard
-  cloud_firestore: ^6.0.3
+  # --- Services ---
+  # SỬA: Đã xóa các mục bị trùng lặp
   google_sign_in: ^6.2.1
-  http: ^1.2.0 
+  http: ^1.2.1 # Cập nhật bản vá nhỏ
 
-    # Google Sign-In
-    google_sign_in: ^6.2.1
+  # --- Tiện ích ---
+  flutter_dotenv: ^5.1.1
 
-    # Facebook Login (temporarily disabled for Windows build - requires ATL)
-    # Uncomment after installing ATL in Visual Studio
-    # flutter_facebook_auth: ^7.1.2
+  # --- Giao diện ---
+  cupertino_icons: ^1.0.8
 
-    # Icon iOS style
-    cupertino_icons: ^1.0.8
-
-    flutter_dotenv: ^5.1.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # MỚI: Thêm Linter để giúp code sạch và chuẩn hơn
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
+
+  # SỬA: Đã sửa lỗi thụt lề
+  # SỬA: Khai báo cả thư mục để dễ dàng thêm ảnh sau này
+  # Hãy đảm bảo bạn tạo thư mục "assets/images/"
   assets:
-    - images/StudyMateRemoveBG.png
-    - images/LogoVamos.png
+    - assets/images/

@@ -1,41 +1,64 @@
+// lib/screens/quiz_screen.dart
+
 import 'package:flutter/material.dart';
-import '../models/category.dart';
+// SỬA: Dùng model mới
+import '../models/flashcard_set.dart'; 
 import '../models/flashcard.dart';
-import '../services/firestore_service.dart'; // SỬA: Dùng FirestoreService
-import '../services/auth_service.dart'; // SỬA: Dùng AuthService
+import '../services/firestore_service.dart';
 import 'quiz_mode_selection_screen.dart';
 
 class QuizScreen extends StatefulWidget {
-  final Category category;
+  // SỬA: Nhận vào FlashcardSet
+  final FlashcardSet set;
   final QuizMode mode;
-  const QuizScreen({super.key, required this.category, required this.mode});
+  const QuizScreen({super.key, required this.set, required this.mode});
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
 }
 
 class _QuizScreenState extends State<QuizScreen> {
+  // SỬA: Khởi tạo service
+  final FirestoreService _db = FirestoreService();
+  
+  // MỚI: State cho FutureBuilder
+  late Future<List<Flashcard>> _cardsFuture;
+
+  // SỬA: Các biến này sẽ được khởi tạo SAU KHI Future hoàn thành
   late List<Flashcard> cards;
   int current = 0;
   int score = 0;
   bool showResult = false;
   int? selected;
-  List<int> questionOrder = [];
+  late List<int> questionOrder;
   List<List<String>> options = [];
-  final rng = UniqueKey();
-  // Chuẩn bị dữ liệu quiz khi khởi tạo
+  DateTime? _sessionStartTime;
+  bool _isQuizInitialized = false; // Flag để tránh khởi tạo lại
+
   @override
   void initState() {
     super.initState();
     _sessionStartTime = DateTime.now();
-    cards = [...widget.category.cards];
+    
+    // MỚI: Bắt đầu tải thẻ ngay lập tức
+    _cardsFuture = _db.getFlashcardsOnce(widget.set.id); // Dùng hàm đã thêm
+    
+    // BỎ: Toàn bộ logic chuẩn bị quiz sẽ được dời đi
+    // cards = [...widget.category.cards];
+    // questionOrder = ...
+    // options = ...
+  }
+  
+  // MỚI: Hàm khởi tạo logic quiz sau khi tải xong thẻ
+  void _initializeQuiz(List<Flashcard> loadedCards) {
+    cards = [...loadedCards]; // Gán thẻ đã tải
     questionOrder = List.generate(cards.length, (i) => i)..shuffle();
     
-    // Prepare options for multiple choice mode
+    // Chuẩn bị options cho trắc nghiệm
     if (widget.mode == QuizMode.multipleChoice) {
+      options = []; // Xóa options cũ (nếu có)
       for(final idx in questionOrder) {
         if(cards.length >= 4) {
-          // Get 3 wrong answers from other cards
           final correct = cards[idx].vietnamese;
           var wrongs = cards.where((c) => c != cards[idx]).map((c) => c.vietnamese).toList();
           wrongs.shuffle();
@@ -43,12 +66,16 @@ class _QuizScreenState extends State<QuizScreen> {
           optionList.add(correct);
           optionList.shuffle();
           options.add(optionList);
-        } else {
-          // If less than 4 cards, create options by duplicating and shuffling
+        } else if (cards.length > 0) {
+          // Xử lý trường hợp có ít hơn 4 thẻ
           final correct = cards[idx].vietnamese;
           var allOptions = cards.map((c) => c.vietnamese).toList();
-          // Shuffle and take 4, ensuring correct answer is included
+          while (allOptions.length < 4) {
+             // Lặp lại các lựa chọn cho đủ 4
+             allOptions.addAll(cards.map((c) => c.vietnamese));
+          }
           allOptions.shuffle();
+          // Đảm bảo đáp án đúng luôn có
           if (!allOptions.contains(correct)) {
             allOptions[0] = correct;
           }
@@ -58,7 +85,9 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
     }
+    _isQuizInitialized = true; // Đánh dấu đã khởi tạo
   }
+
 
   void onSelect(int optionIdx) {
     setState(() { selected = optionIdx; showResult = true; });
@@ -69,20 +98,19 @@ class _QuizScreenState extends State<QuizScreen> {
       if (current < cards.length-1) {
         setState((){ current++; showResult=false; selected=null; });
       } else {
-        showQuizSummary();
+        _showQuizSummary(); // SỬA: Đổi tên hàm
       }
     });
   }
 
-  // SỬA: Hàm này để gọi service
-  Future<void> showQuizSummary() async {
-    // Record the learning session
+  // SỬA: Đổi tên hàm
+  Future<void> _showQuizSummary() async {
     if (_sessionStartTime != null) {
       final duration = DateTime.now().difference(_sessionStartTime!);
       try {
         await _db.recordQuizSession(
-          categoryId: widget.category.id,
-          categoryName: widget.category.name,
+          categoryId: widget.set.id, // SỬA
+          categoryName: widget.set.title, // SỬA
           duration: duration,
           quizScore: score,
           totalQuestions: cards.length,
@@ -97,6 +125,7 @@ class _QuizScreenState extends State<QuizScreen> {
     );
     showDialog(
       context: context,
+      barrierDismissible: false, // Thêm
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Hoàn thành Quiz'),
@@ -112,7 +141,7 @@ class _QuizScreenState extends State<QuizScreen> {
           TextButton(
             onPressed: (){
               Navigator.of(context)
-                ..pop()
+                ..pop() // Pop Dialog
                 ..pop() // Pop QuizScreen
                 ..pop(); // Pop QuizModeSelectionScreen
             },
@@ -131,26 +160,69 @@ class _QuizScreenState extends State<QuizScreen> {
       if (current < cards.length-1) {
         setState((){ current++; showResult=false; });
       } else {
-        showQuizSummary();
+        _showQuizSummary(); // SỬA: Đổi tên hàm
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (cards.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Quiz')),
-        body: const Center(child: Text('Chủ đề chưa có flashcard.')), 
-      );
-    }
-    
+    // SỬA: Dùng FutureBuilder
+    return FutureBuilder<List<Flashcard>>(
+      future: _cardsFuture,
+      builder: (context, snapshot) {
+        // 1. Đang tải
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(title: Text(widget.set.title)),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // 2. Bị lỗi
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: Text(widget.set.title)),
+            body: Center(child: Text('Lỗi tải thẻ: ${snapshot.error}')),
+          );
+        }
+
+        // 3. Tải xong, không có thẻ
+        final loadedCards = snapshot.data ?? [];
+        if (loadedCards.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: Text(widget.set.title)),
+            body: const Center(child: Text('Chủ đề chưa có flashcard.')),
+          );
+        }
+
+        // 4. MỚI: Khởi tạo state của quiz (chỉ 1 lần)
+        if (!_isQuizInitialized) {
+          _initializeQuiz(loadedCards);
+        }
+        
+        // 5. Build UI chính
+        // (Kiểm tra lại phòng trường hợp state chưa kịp build)
+        if (!_isQuizInitialized) {
+           return Scaffold(
+            appBar: AppBar(title: Text(widget.set.title)),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return _buildQuizUI(context);
+      },
+    );
+  }
+
+  // MỚI: Tách UI chính ra
+  Widget _buildQuizUI(BuildContext context) {
     final card = cards[questionOrder[current]];
     final isMultipleChoice = widget.mode == QuizMode.multipleChoice;
     
     return Scaffold(
       appBar: AppBar(
-        title: Text('Quiz: ${widget.category.name}'),
+        title: Text('Quiz: ${widget.set.title}'), // SỬA
         actions: [
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -195,6 +267,12 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildMultipleChoiceView(Flashcard card) {
+    // ... (Giữ nguyên toàn bộ logic UI) ...
+    // Thêm kiểm tra options có rỗng không
+    if (options.isEmpty || options.length <= current) {
+      return Center(child: Text("Đang tạo câu hỏi..."));
+    }
+    
     final cardOptions = options[current];
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -211,7 +289,7 @@ class _QuizScreenState extends State<QuizScreen> {
           ),
         ),
         const SizedBox(height: 30),
-        ...List.generate(4, (i) => Padding(
+        ...List.generate(cardOptions.length, (i) => Padding( // SỬA: Dùng cardOptions.length
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -233,7 +311,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 }
 
-// Lớp QuizTextAnswer không thay đổi
+// Lớp QuizTextAnswer (Giữ nguyên, không thay đổi)
 class QuizTextAnswer extends StatefulWidget {
   final Flashcard card;
   final bool show;

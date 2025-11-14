@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart'; // SỬA: Dùng AuthService
-import 'login_screen.dart';
+import '../services/auth_service.dart';
+// SỬA: Xóa import LoginScreen vì StreamBuilder sẽ tự điều hướng
+// import 'login_screen.dart'; 
 
 class SettingsScreen extends StatelessWidget {
   final VoidCallback? onToggleTheme;
@@ -9,7 +10,9 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // SỬA: Lấy isDark từ widget.isDark, không phải Theme.of(context)
+    // vì theme có thể đang ở 'system'.
+    final isDark = widget.isDark;
     
     return Scaffold(
       backgroundColor: isDark ? Color(0xFF0F172A) : Color(0xFFF8FAFC),
@@ -18,15 +21,13 @@ class SettingsScreen extends StatelessWidget {
         elevation: 0,
         title: const Text(
           'Cài đặt',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          // SỬA: Không cần style vì nó sẽ lấy từ theme
         ),
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back,
-            color: isDark ? Colors.white : Color(0xFF1E293B),
+            // SỬA: Không cần màu vì AppBar theme sẽ xử lý
+            // color: isDark ? Colors.white : Color(0xFF1E293B),
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -34,7 +35,6 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ... (Tất cả các mục cài đặt khác giữ nguyên) ...
           _buildSectionHeader('Tài khoản', isDark),
           _buildSettingsCard(
             context,
@@ -72,6 +72,15 @@ class SettingsScreen extends StatelessWidget {
                _buildSettingsTile(
                 context,
                 isDark,
+                icon: isDark ? Icons.dark_mode : Icons.light_mode,
+                title: 'Chế độ hiển thị',
+                subtitle: isDark ? 'Đang ở chế độ tối' : 'Đang ở chế độ sáng',
+                onTap: onToggleTheme, // Gán hàm
+              ),
+              const Divider(height: 1),
+              _buildSettingsTile(
+                context,
+                isDark,
                 icon: Icons.notifications,
                 title: 'Thông báo',
                 subtitle: 'Quản lý thông báo và nhắc nhở',
@@ -79,7 +88,6 @@ class SettingsScreen extends StatelessWidget {
                   _showComingSoon(context);
                 },
               ),
-              // ... (Các mục khác) ...
             ],
           ),
           const SizedBox(height: 24),
@@ -88,7 +96,7 @@ class SettingsScreen extends StatelessWidget {
             context,
             isDark,
             children: [
-               _buildSettingsTile(
+              _buildSettingsTile(
                 context,
                 isDark,
                 icon: Icons.info,
@@ -96,7 +104,6 @@ class SettingsScreen extends StatelessWidget {
                 subtitle: '1.0.0',
                 onTap: null,
               ),
-              // ... (Các mục khác) ...
             ],
           ),
           const SizedBox(height: 24),
@@ -144,6 +151,8 @@ class SettingsScreen extends StatelessWidget {
     required List<Widget> children,
   }) {
     return Container(
+      // SỬA: Dùng ClipRRect để bo góc
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: isDark ? Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -228,7 +237,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final auth = AuthService(); // SỬA: Dùng AuthService
+    final auth = AuthService(); 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -246,19 +255,19 @@ class SettingsScreen extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(dialogContext);
               try {
+                //
+                // ==================================================
+                // SỬA LỖI: Chỉ cần gọi signOut.
+                // StreamBuilder trong splash_screen sẽ tự động
+                // điều hướng về LoginScreen.
+                // ==================================================
+                //
                 await auth.signOut();
-                if (context.mounted) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => LoginScreen(
-                        onToggleTheme: onToggleTheme,
-                        isDark: isDark,
-                      ),
-                    ),
-                    (route) => false,
-                  );
-                }
+                
+                //
+                // SỬA: XÓA TOÀN BỘ LOGIC NAVIGATOR.PUSHANDREMOVEUNTIL
+                //
+                
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
