@@ -22,7 +22,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(milliseconds: 200), () {
+    Timer(const Duration(seconds: 3), () {
       if (mounted) {
         setState(() {
           _showLogos = true;
@@ -30,7 +30,6 @@ class _SplashScreenState extends State<SplashScreen> {
       }
     });
   }
-
   @override
   Widget build(BuildContext context) {
     // SỬA: Dùng StreamBuilder để tự động điều hướng
@@ -67,11 +66,26 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset('images/StudyMateRemoveBG.png', width: 200),
+              Image.asset(
+                'images/StudyMateRemoveBG.png',
+                width: 200,
+              ),
               const SizedBox(height: 20),
-              const Text('from', style: TextStyle(fontFamily: 'Roboto', fontSize: 18, color: Colors.grey)),
-              const SizedBox(height: 6),
-              Image.asset('images/LogoVamos.png', width: 130),
+
+              Text(
+                'from',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 15,
+                  color: Colors.grey.withOpacity(0.6)
+                ),
+              ),
+              const SizedBox(height: 5),
+
+              Image.asset(
+                'images/LogoVamos.png',
+                width: 130,
+              ),
             ],
           ),
         ),

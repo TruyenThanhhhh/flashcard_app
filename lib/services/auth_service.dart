@@ -1,194 +1,176 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-// Facebook auth is temporarily disabled for Windows build
-// import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb; // Thêm import này
 
 class AuthService {
-  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // Lấy stream theo dõi trạng thái đăng nhập
-  Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Lấy người dùng hiện tại
-  User? get currentUser => _firebaseAuth.currentUser;
+  User? get currentUser => _auth.currentUser;
 
-  // Đăng nhập bằng Google
-  Future<User?> signInWithGoogle() async {
+  // Stream theo dõi trạng thái đăng nhập
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  // --- ĐĂNG KÝ EMAIL/PASSWORD ---
+  Future<UserCredential?> signUpWithEmail(
+    String email,
+    String password,
+    String name,
+    String username,
+  ) async {
     try {
-      // Configure Google Sign-In for Windows (uses web-based OAuth)
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
-      );
-      
-      // Sign out first to ensure clean state
-      await googleSignIn.signOut();
-      
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        return null; // Người dùng hủy
-      }
-      
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
-        throw Exception('Không thể lấy thông tin xác thực từ Google');
-      }
-      
-      final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      
-      final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
-      return userCredential.user;
-    } catch (e) {
-      print('Google Sign-In Error: $e');
-      rethrow;
-    }
-  }
+      final usernameQuery = await _firestore
+          .collection('users')
+          .where('username', isEqualTo: username)
+          .limit(1)
+          .get();
 
-  // Đăng nhập bằng Facebook
-  // NOTE: Facebook auth is temporarily disabled for Windows build
-  // Uncomment the import and this code after installing ATL in Visual Studio
-  Future<User?> signInWithFacebook() async {
-    throw UnimplementedError(
-      'Facebook authentication is currently disabled. '
-      'Please uncomment flutter_facebook_auth in pubspec.yaml and install ATL in Visual Studio to enable it.'
-    );
-    // try {
-    //   final LoginResult result = await FacebookAuth.instance.login();
-    //   if (result.status == LoginStatus.success) {
-    //     final AccessToken accessToken = result.accessToken!;
-    //     final AuthCredential credential = FacebookAuthProvider.credential(accessToken.tokenString);
-    //     final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
-    //     return userCredential.user;
-    //   }
-    //   return null;
-    // } catch (e) {
-    //   print(e);
-    //   rethrow;
-    // }
-  }
+      if (usernameQuery.docs.isNotEmpty) {
+        throw 'Username này đã tồn tại. Vui lòng chọn username khác.';
+      }
 
-  // Đăng nhập bằng Email/Password
-  Future<User?> signInWithEmailAndPassword(String email, String password) async {
-    try {
-      final UserCredential userCredential = await _firebaseAuth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      return userCredential.user;
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
+
+      // Cập nhật profile của user trong Firebase Auth (để có displayName)
+      await userCredential.user?.updateDisplayName(name);
+
+      // Lưu thông tin (sẽ không có photoURL lúc này)
+      await _saveUserToFirestore(userCredential.user!);
+      return userCredential;
     } on FirebaseAuthException catch (e) {
-      throw Exception(e.code); 
+      if (e.code == 'email-already-in-use') {
+        throw 'Email này đã được sử dụng. Vui lòng chọn email khác.';
+      }
+      throw e.message ?? 'Đã có lỗi xảy ra khi đăng ký.';
     }
   }
 
-  // Đăng ký bằng Email/Password
-  Future<User?> createUserWithEmailAndPassword({
-    required String email,
-    required String password,
-    required String username,
-    String? displayName,
-  }) async {
+  // --- ĐĂNG NHẬP BẰNG EMAIL HOẶC USERNAME ---
+  Future<UserCredential?> signInWithEmailOrUsername(
+    String loginId,
+    String password,
+  ) async {
     try {
-      final UserCredential userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      final user = userCredential.user;
-      if (user != null) {
-        if (displayName != null && displayName.isNotEmpty) {
-          await user.updateDisplayName(displayName);
+      String email = loginId;
+
+      if (!loginId.contains('@')) {
+        final usernameQuery = await _firestore
+            .collection('users')
+            .where('username', isEqualTo: loginId)
+            .limit(1)
+            .get();
+
+        if (usernameQuery.docs.isEmpty) {
+          throw 'Không tìm thấy tài khoản với username này.';
         }
-        await _saveUserProfile(
-          user: user,
-          username: username,
-          displayName: displayName ?? user.displayName,
-        );
+        email = usernameQuery.docs.first.data()['email'];
       }
-      return user;
+      // Đăng nhập với email đã lấy được
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Cập nhật lastLogin khi đăng nhập
+      await _saveUserToFirestore(userCredential.user!);
+      return userCredential;
     } on FirebaseAuthException catch (e) {
-      throw Exception(e.code);
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential') {
+        throw 'Email/Username hoặc mật khẩu không đúng.';
+      }
+      throw e.message ?? 'Đã có lỗi xảy ra khi đăng nhập.';
     }
   }
 
-  // Đăng xuất
+  // --- ĐĂNG NHẬP GOOGLE (Đã cập nhật) ---
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      UserCredential? userCredential;
+
+      if (kIsWeb) {
+        // --- Logic cho WEB ---
+        GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        userCredential = await _auth.signInWithPopup(googleProvider);
+      } else {
+        // --- Logic cho Mobile (Android/iOS) ---
+        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+        if (googleUser == null) return null; // Người dùng hủy
+
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        userCredential = await _auth.signInWithCredential(credential);
+      }
+
+      if (userCredential == null || userCredential.user == null) {
+        throw "Đăng nhập Google thất bại.";
+      }
+
+      // Lưu thông tin user (tên, avatar) vào Firestore
+      await _saveUserToFirestore(userCredential.user!);
+
+      return userCredential;
+    } catch (e) {
+      print("LỖI GOOGLE SIGN-IN THỰC TẾ: $e");
+      throw e.toString();
+    }
+  }
+
+  // --- ĐĂNG XUẤT ---
   Future<void> signOut() async {
-    try {
-      // Sign out from Google
-      final GoogleSignIn googleSignIn = GoogleSignIn();
-      await googleSignIn.signOut();
-    } catch (e) {
-      print('Google Sign-Out Error: $e');
-      // Continue with Firebase sign out even if Google sign out fails
-    }
-    
-    // Facebook auth is disabled, so skip logout
-    // try {
-    //   await FacebookAuth.instance.logOut();
-    // } catch (_) {} // Bỏ qua lỗi nếu chưa bật
-    
-    try {
-      await _firebaseAuth.signOut();
-    } catch (e) {
-      print('Firebase Sign-Out Error: $e');
-      rethrow; // Re-throw Firebase sign out errors as they're critical
-    }
+    await _googleSignIn.signOut();
+    await _auth.signOut();
   }
 
-  Future<void> _saveUserProfile({
-    required User user,
-    required String username,
-    String? displayName,
-  }) async {
-    final docRef = _firestore.collection('users').doc(user.uid);
-    final snapshot = await docRef.get();
-    final now = FieldValue.serverTimestamp();
-
-    await docRef.set({
-      'username': username,
-      'username_lower': username.toLowerCase(),
-      'email': user.email,
-      'displayName': displayName ?? user.displayName ?? '',
-      'updatedAt': now,
-      if (!snapshot.exists) 'createdAt': now,
-    }, SetOptions(merge: true));
-  }
-
-  Future<bool> isUsernameTaken(String username) async {
-    final snapshot = await _firestore
-        .collection('users')
-        .where('username_lower', isEqualTo: username.toLowerCase())
-        .limit(1)
-        .get();
-    return snapshot.docs.isNotEmpty;
-  }
-
-  Future<String?> getEmailByUsername(String username) async {
-    if (username.isEmpty) return null;
-    final snapshot = await _firestore
-        .collection('users')
-        .where('username_lower', isEqualTo: username.toLowerCase())
-        .limit(1)
-        .get();
-    if (snapshot.docs.isEmpty) return null;
-    return snapshot.docs.first.data()['email'] as String?;
-  }
-
-  Future<void> ensureUserProfile({
-    required User user,
-    required String fallbackUsername,
-  }) async {
+  // --- HÀM LƯU USER VÀO FIRESTORE (ĐÃ CẬP NHẬT) ---
+  Future<void> _saveUserToFirestore(User user) async {
+    // Tự động tạo username từ email nếu chưa có
     final docRef = _firestore.collection('users').doc(user.uid);
     final doc = await docRef.get();
-    if (!doc.exists || (doc.data()?['username'] as String?) == null) {
-      await _saveUserProfile(
-        user: user,
-        username: fallbackUsername,
-        displayName: user.displayName,
-      );
+
+    String username =
+        user.email?.split('@').first ?? 'user_${user.uid.substring(0, 6)}';
+
+    // Chỉ tạo các trường này nếu document chưa tồn tại (lần đăng ký đầu tiên)
+    if (!doc.exists) {
+      await docRef.set({
+        'uid': user.uid,
+        'email': user.email,
+        'name': user.displayName ?? 'New User', // Lấy tên từ Google/Đăng ký
+        'photoURL': user.photoURL, // Lấy Avatar URL từ Google
+        'username': username,
+        'createdAt': FieldValue.serverTimestamp(),
+        'stats': {
+          'totalFlashcards': 0,
+          'totalNotes': 0,
+          'streak': 1, // Bắt đầu chuỗi với 1 ngày
+          'totalHours': 0,
+        },
+        'setting': {
+          'language': 'vi',
+          'notifications': true,
+          'themeMode': 'light',
+        },
+        // Thêm lastLogin khi tạo
+        'lastLogin': FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Nếu đã tồn tại (đăng nhập), chỉ cập nhật các trường cần thiết
+      await docRef.update({
+        'lastLogin': FieldValue.serverTimestamp(),
+        // Cập nhật tên/avatar nếu nó thay đổi từ Google
+        'name': user.displayName,
+        'photoURL': user.photoURL,
+      });
     }
   }
 }
