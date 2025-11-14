@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../models/category.dart';
-import '../models/flashcart.dart';
+import '../models/flashcard.dart';
+import '../services/firestore_service.dart'; // SỬA: Dùng FirestoreService
+import '../services/auth_service.dart'; // SỬA: Dùng AuthService
 import 'flashcards_screen.dart';
 import 'learning_screen.dart';
-import 'quiz_screen.dart';
+import 'quiz_mode_selection_screen.dart';
 import 'ai_assistant_screen.dart';
 import '../services/auth_service.dart';
 
@@ -168,24 +168,41 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       }
+    }
 
+    // Cập nhật state (chỉ dùng cho phần thống kê nhanh ở tab Home)
+    // Dùng mounted để tránh lỗi
+    if (mounted) {
       setState(() {
-        categories = loadedCategories;
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        errorMessage = 'Lỗi khi tải dữ liệu: $e';
-        isLoading = false;
+        studyStreak = streak;
+        totalHours = hours;
       });
     }
+
+    // Trả về dữ liệu cho tab Thống kê
+    return {
+      'streak': streak,
+      'totalHours': hours,
+      'totalQuizzes': quizzes,
+      'totalLearningSessions': learning,
+      'todaySessions': today,
+      'thisWeekSessions': week,
+      'recentSessions': sessions, // Truyền List<QueryDocumentSnapshot>
+    };
+  }
+
+  Future<void> _refreshStats() async {
+    setState(() {
+      _statsFuture = _loadUserStats();
+    });
+    await _statsFuture;
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: isDark ? Colors.black : Colors.grey[100],
       drawer: _buildDrawer(context, isDark),
       appBar: AppBar(
         // ... (Giữ nguyên AppBar) ...
@@ -194,7 +211,10 @@ class _HomeScreenState extends State<HomeScreen> {
         leading: Builder(
           builder: (BuildContext context) {
             return IconButton(
-              icon: const Icon(Icons.menu, color: Colors.black87),
+              icon: Icon(
+                Icons.menu,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
               onPressed: () {
                 Scaffold.of(context).openDrawer();
               },
@@ -209,7 +229,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.black87),
+            icon: Icon(
+              Icons.search,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
             onPressed: () {},
           ),
           IconButton(
@@ -224,7 +247,9 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         // ... (Giữ nguyên BottomNavigationBar) ...
         currentIndex: selectedTab,
-        onTap: (i) => setState(() => selectedTab = i),
+        onTap: (i) {
+          setState(() => selectedTab = i);
+        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
           BottomNavigationBarItem(
@@ -233,11 +258,20 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: selectedTab == 0 ? _buildHomeContent() : _buildStatistics(),
+      body: selectedTab == 0 ? _buildHomeContent(context) : _buildStatistics(),
     );
   }
 
-  Widget _buildHomeContent() {
+  Widget _buildHomeContent(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final user = _auth.currentUser;
+    final userInitial = user?.displayName?.isNotEmpty == true 
+        ? user!.displayName![0].toUpperCase()
+        : (user?.email?.isNotEmpty == true 
+            ? user!.email![0].toUpperCase() 
+            : 'U');
+    final userName = user?.displayName ?? 'Người dùng';
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -282,6 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.orangeAccent,
                 ),
                 onPressed: widget.onToggleTheme,
+                tooltip: isDark ? 'Chế độ tối' : 'Chế độ sáng',
               ),
             ],
           ),
@@ -324,31 +359,30 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: const TextStyle(color: Colors.red),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _loadCategories,
-                      child: const Text('Thử lại'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (categories.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  children: [
-                    const Icon(Icons.folder_open, size: 64, color: Colors.grey),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Chưa có chủ đề nào',
-                      style: TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Tạo chủ đề mới để bắt đầu học',
-                      style: TextStyle(color: Colors.grey),
+                  ),
+                );
+              }
+              
+              final categories = snapshot.data;
+              
+              if (categories == null || categories.isEmpty) {
+                 return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.folder_open, size: 64, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Chưa có chủ đề nào',
+                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Nhấn "Thêm" để tạo chủ đề mới',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -394,7 +428,47 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ],
 
+              // Hiển thị danh sách chủ đề
+              return Column(
+                children: categories.map((category) => _buildCourseCard(
+                  category,
+                  '${category.cards.length} thuật ngữ',
+                  Colors.green[200]!,
+                )).toList(),
+              );
+            },
+          ),
           const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+  
+  // SỬA: Hàm thêm chủ đề
+  void _showAddCategoryDialog(BuildContext context) {
+    final nameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Thêm chủ đề mới'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(labelText: 'Tên chủ đề'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
+          ElevatedButton(
+            onPressed: () async {
+              String name = nameController.text.trim();
+              if (name.isEmpty) return;
+              
+              await _db.addCategory(name); // Gọi service
+              
+              if (context.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Thêm'),
+          ),
         ],
       ),
     );
@@ -549,9 +623,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: 'Chế độ học',
                   subtitle: 'Học và ghi nhớ flashcard',
                   color: Colors.green,
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(ctx);
-                    Navigator.push(
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) =>
@@ -567,14 +641,39 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: 'Làm Quiz',
                   subtitle: 'Kiểm tra kiến thức của bạn',
                   color: Colors.orange,
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(ctx);
-                    Navigator.push(
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => QuizScreen(category: category),
+                        builder: (context) => QuizModeSelectionScreen(category: category),
                       ),
                     );
+                  },
+                ),
+                // SỬA: Thêm nút Xóa và Sửa
+                const Divider(height: 24),
+                _buildOptionTile(
+                  ctx,
+                  icon: Icons.edit,
+                  title: 'Đổi tên chủ đề',
+                  subtitle: 'Sửa tên cho chủ đề này',
+                  color: Colors.blueGrey,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showEditCategoryDialog(context, category);
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildOptionTile(
+                  ctx,
+                  icon: Icons.delete,
+                  title: 'Xóa chủ đề',
+                  subtitle: 'Xóa chủ đề và tất cả thẻ bên trong',
+                  color: Colors.red,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showDeleteCategoryDialog(context, category);
                   },
                 ),
                 SizedBox(height: MediaQuery.of(context).padding.bottom + 10),
@@ -585,6 +684,59 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+  
+  // SỬA: Hàm sửa chủ đề
+  void _showEditCategoryDialog(BuildContext context, Category category) {
+    final nameController = TextEditingController(text: category.name);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Sửa tên chủ đề'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(labelText: 'Tên chủ đề'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
+          ElevatedButton(
+            onPressed: () async {
+              String name = nameController.text.trim();
+              if (name.isEmpty) return;
+              
+              await _db.updateCategoryName(category.id, name); // Gọi service
+              
+              if (context.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // SỬA: Hàm xóa chủ đề
+  void _showDeleteCategoryDialog(BuildContext context, Category category) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Xác nhận xóa'),
+        content: Text('Bạn có chắc chắn muốn xóa chủ đề "${category.name}" không? Toàn bộ flashcard bên trong cũng sẽ bị xóa vĩnh viễn.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
+          ElevatedButton(
+            onPressed: () async {
+              await _db.deleteCategory(category.id); // Gọi service
+              if (context.mounted) Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildOptionTile(
     BuildContext context, {
@@ -643,10 +795,225 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStatistics() {
-    return const Center(
-      child: Text(
-        "Thống kê đang phát triển...",
-        style: TextStyle(fontSize: 20),
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _statsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+        
+        if (snapshot.hasError) {
+           return Center(
+             child: Text('Lỗi tải thống kê: ${snapshot.error}'),
+           );
+        }
+        
+        final stats = snapshot.data ?? {};
+        final recentSessions = (stats['recentSessions'] as List<QueryDocumentSnapshot>?) ?? [];
+
+        return RefreshIndicator(
+          onRefresh: _refreshStats,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                // Header
+                const Text(
+                  'Thống kê học tập',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Main Stats Cards
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCardLarge(
+                        'Chuỗi ngày học',
+                        '${stats['streak'] ?? 0}',
+                        'ngày',
+                        Colors.pink,
+                        Icons.local_fire_department,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCardLarge(
+                        'Tổng giờ học',
+                        (stats['totalHours'] as double? ?? 0.0).toStringAsFixed(1),
+                        'giờ',
+                        Colors.green,
+                        Icons.access_time,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCardLarge(
+                        'Buổi học hôm nay',
+                        '${stats['todaySessions'] ?? 0}',
+                        'buổi',
+                        Colors.blue,
+                        Icons.today,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCardLarge(
+                        'Buổi học tuần này',
+                        '${stats['thisWeekSessions'] ?? 0}',
+                        'buổi',
+                        Colors.orange,
+                        Icons.calendar_view_week,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                // Activity Summary
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tổng quan hoạt động',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildActivityRow('Tổng buổi học', '${stats['totalLearningSessions'] ?? 0}', Icons.school, Colors.blue),
+                      const SizedBox(height: 12),
+                      _buildActivityRow('Tổng quiz đã làm', '${stats['totalQuizzes'] ?? 0}', Icons.quiz, Colors.orange),
+                      const SizedBox(height: 12),
+                      _buildActivityRow('Tổng giờ học', '${(stats['totalHours'] as double? ?? 0.0).toStringAsFixed(1)} giờ', Icons.timer, Colors.green),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Recent Sessions
+                const Text(
+                  'Lịch sử học tập gần đây',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (recentSessions.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.history, size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Chưa có lịch sử học tập',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Bắt đầu học để xem thống kê',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ...recentSessions.map((doc) => _buildSessionCard(doc.data() as Map<String, dynamic>)),
+                
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCardLarge(String title, String value, String unit, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color, color.withOpacity(0.7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.white, size: 32),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          Text(
+            unit,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withOpacity(0.9),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withOpacity(0.9),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -765,6 +1132,15 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text('Cài đặt'),
             onTap: () {
               Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsScreen(
+                    onToggleTheme: widget.onToggleTheme,
+                    isDark: widget.isDark,
+                  ),
+                ),
+              );
             },
           ),
           ListTile(
@@ -772,6 +1148,22 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text('Trợ giúp'),
             onTap: () {
               Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HelpScreen()),
+              );
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text(
+              'Đăng xuất',
+              style: TextStyle(color: Colors.red),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              _showLogoutDialog(context);
             },
           ),
           // Nút đăng xuất (đã có từ lần trước)

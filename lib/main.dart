@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'screens/splash_screen.dart';
+
+// SỬA CÁC DÒNG IMPORT
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'firebase_options.dart';
@@ -7,17 +10,21 @@ import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart'; // Import Login Screen
 import 'services/auth_service.dart'; // Import Auth Service
 
-Future<void> main() async {
+// Hàm main đã được cập nhật
+void main() async {
+  // Đảm bảo Flutter đã sẵn sàng
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await dotenv.load(fileName: ".env");
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    print("✅ Firebase đã khởi tạo thành công!");
-  } catch (e) {
-    print("❌ Lỗi khi khởi tạo Firebase: $e");
-  }
+  // Khởi tạo Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
+  print("✅ Firebase Initialized!"); // Thông báo đã kết nối thành công
+  
+  // Chạy ứng dụng
   runApp(const FlashcardApp());
 }
 

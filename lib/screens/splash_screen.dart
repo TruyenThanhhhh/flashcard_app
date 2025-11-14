@@ -1,35 +1,68 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // SỬA: Dùng Firebase
+import '../services/auth_service.dart'; // SỬA: Dùng AuthService
 import 'home_screen.dart';
+import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final VoidCallback? onToggleTheme;
+  final bool isDark;
+  const SplashScreen({super.key, this.onToggleTheme, this.isDark = false});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  // SỬA: Dùng AuthService
+  final AuthService _auth = AuthService();
+  bool _showLogos = false;
+
   @override
   void initState() {
     super.initState();
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        setState(() {
+          _showLogos = true;
+        });
       }
     });
   }
   @override
   Widget build(BuildContext context) {
+    // SỬA: Dùng StreamBuilder để tự động điều hướng
+    return StreamBuilder<User?>(
+      stream: _auth.authStateChanges, // Lắng nghe trạng thái đăng nhập
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildSplashContent();
+        }
+        if (snapshot.hasData) {
+          // Đã đăng nhập
+          return HomeScreen(
+            onToggleTheme: widget.onToggleTheme,
+            isDark: widget.isDark,
+          );
+        } else {
+          // Chưa đăng nhập
+          return LoginScreen(
+            onToggleTheme: widget.onToggleTheme,
+            isDark: widget.isDark,
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildSplashContent() {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
         child: AnimatedOpacity(
-          opacity: 1.0,
-          duration: const Duration(seconds: 2),
+          opacity: _showLogos ? 1.0 : 0.0,
+          duration: const Duration(seconds: 1),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
