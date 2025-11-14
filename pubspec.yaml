@@ -1,47 +1,51 @@
-name: flashcard_app
-description: "A flashcard learning app using Firebase Firestore and Authentication."
-publish_to: 'none' # Không public lên pub.dev
+  name: flashcard_app
+  description: "A flashcard learning app using Firebase Firestore and Authentication."
+  publish_to: 'none' # Không public lên pub.dev
 
-version: 1.0.0+1
+  version: 1.0.0+1
 
-environment:
-  sdk: ^3.9.2
-  
+  environment:
+    sdk: ^3.9.2
+    
 
-dependencies:
+  dependencies:
+    flutter:
+      sdk: flutter
+
+    # Firebase core để khởi tạo ứng dụng
+    firebase_core: ^4.2.0
+
+    # Firebase Authentication để đăng nhập/đăng ký người dùng
+    firebase_auth: ^6.1.1
+
+    # Cloud Firestore để lưu trữ dữ liệu flashcard
+    cloud_firestore: ^6.0.3
+    http: ^1.2.0 
+
+    # UUID để tạo ID duy nhất cho flashcard
+    uuid: ^4.5.1
+
+    # Google Sign-In
+    google_sign_in: ^6.2.1
+
+    # Facebook Login (temporarily disabled for Windows build - requires ATL)
+    # Uncomment after installing ATL in Visual Studio
+    # flutter_facebook_auth: ^7.1.2
+
+    # Icon iOS style
+    cupertino_icons: ^1.0.8
+
+    flutter_dotenv: ^5.1.1
+
+  dev_dependencies:
+    flutter_test:
+      sdk: flutter
+
+    flutter_lints: ^5.0.0
+
   flutter:
-    sdk: flutter
-
-  # Firebase core để khởi tạo ứng dụng
-  firebase_core: ^4.2.0
-
-  # Firebase Authentication để đăng nhập/đăng ký người dùng
-  firebase_auth: ^6.1.1
-
-  # Cloud Firestore để lưu trữ dữ liệu flashcard
-  cloud_firestore: ^6.0.3
-  http: ^1.2.0 
-
-  # UUID để tạo ID duy nhất cho flashcard
-  uuid: ^4.5.1
-
-  # Icon iOS style
-  cupertino_icons: ^1.0.8
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-
-  flutter_lints: ^5.0.0
-
-flutter:
-  uses-material-design: true
-  assets:
-    - images/StudyMateRemoveBG.png
-    - images/LogoVamos.png
-
-
-  # Nếu bạn có hình ảnh hoặc dữ liệu mẫu, khai báo tại đây:
-  # assets:
-  #   - assets/images/
-  #   - assets/data/
+    uses-material-design: true
+    assets:
+      - images/StudyMateRemoveBG.png
+      - images/LogoVamos.png
+      - .env

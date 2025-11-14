@@ -1,4 +1,4 @@
-import 'flashcart.dart';
+import 'flashcard.dart'; // Đảm bảo tên file này chính xác
 
 class Category {
   final String id;
@@ -7,6 +7,7 @@ class Category {
 
   Category({required this.id, required this.name, required this.cards});
 
+  // --- HÀM CŨ CỦA BẠN ---
   factory Category.fromJson(Map<String, dynamic> json) {
     return Category(
       id: json['id'],
@@ -22,8 +23,31 @@ class Category {
       'cards': cards.map((c) => c.toJson()).toList(),
     };
   }
+  
+  // --- HÀM MỚI (QUAN TRỌNG): Để đọc từ Firestore ---
+  factory Category.fromMap(String id, Map<String, dynamic> data) {
+    return Category(
+      id: id, // ID lấy từ doc.id
+      name: data['name'] ?? '', // Đọc key 'name'
+      cards: [], // Sẽ được service điền vào sau
+    );
+  }
+
+  // --- HÀM MỚI (QUAN TRỌNG): Để cập nhật danh sách thẻ ---
+  Category copyWith({
+    String? id,
+    String? name,
+    List<Flashcard>? cards,
+  }) {
+    return Category(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      cards: cards ?? this.cards,
+    );
+  }
 }
 
+// Lớp QuizResult không thay đổi
 class QuizResult {
   final String categoryId;
   final int total;

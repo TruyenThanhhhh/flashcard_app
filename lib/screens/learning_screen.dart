@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../models/category.dart';
-import '../models/flashcart.dart';
+import '../models/flashcard.dart';
+import '../services/firestore_service.dart'; // SỬA: Dùng FirestoreService
+import '../services/auth_service.dart'; // SỬA: Dùng AuthService
 
 class LearningScreen extends StatefulWidget {
   final Category category;
@@ -17,6 +19,11 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
   int index = 0;
   bool showAnswer = false;
   bool showTip = true;
+  DateTime? _sessionStartTime;
+  
+  // SỬA: Khởi tạo các service
+  final FirestoreService _db = FirestoreService();
+  final AuthService _auth = AuthService();
   
   late AnimationController _flipController;
   late AnimationController _progressController;
@@ -25,6 +32,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
   @override
   void initState() {
     super.initState();
+    _sessionStartTime = DateTime.now();
     cards = [...widget.category.cards];
     rememberedCards = List.filled(cards.length, false);
     
@@ -81,10 +89,28 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
     });
   }
 
-  void _showCompletionDialog() {
+  // SỬA: Hàm này để gọi service
+  Future<void> _showCompletionDialog() async {
     final remembered = rememberedCards.where((e) => e).length;
     final total = cards.length;
-    final percentage = (remembered / total * 100).toInt();
+    final percentage = (total == 0) ? 0 : (remembered / total * 100).toInt();
+    
+    // Record the learning session
+    if (_sessionStartTime != null) {
+      final duration = DateTime.now().difference(_sessionStartTime!);
+      // Không cần check _auth.currentUser nữa vì service đã làm
+      try {
+        await _db.recordLearningSession(
+          categoryId: widget.category.id,
+          categoryName: widget.category.name,
+          duration: duration,
+          cardsLearned: remembered,
+        );
+      } catch (e) {
+        print("Lỗi khi lưu buổi học: $e");
+        // Có thể hiện SnackBar lỗi
+      }
+    }
     
     showDialog(
       context: context,

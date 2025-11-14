@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+// SỬA CÁC DÒNG IMPORT
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; 
+import 'firebase_options.dart';
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    print("✅ Firebase đã khởi tạo thành công!");
-  } catch (e) {
-    print("❌ Lỗi khi khởi tạo Firebase: $e");
-  }
+// Hàm main đã được cập nhật
+void main() async {
+  // Đảm bảo Flutter đã sẵn sàng
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  await dotenv.load(fileName: ".env");
+
+  // Khởi tạo Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
+  print("✅ Firebase Initialized!"); // Thông báo đã kết nối thành công
+  
+  // Chạy ứng dụng
   runApp(const FlashcardApp());
 }
 
@@ -106,7 +113,10 @@ class _FlashcardAppState extends State<FlashcardApp> {
               TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
-      home: const SplashScreen(),
+      home: SplashScreen(
+        onToggleTheme: toggleTheme,
+        isDark: themeMode == ThemeMode.dark,
+      ),
     );
   }
 }

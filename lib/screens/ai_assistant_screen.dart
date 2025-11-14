@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AIAssistantScreen extends StatefulWidget {
   const AIAssistantScreen({super.key});
@@ -14,9 +15,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
-
-  // Gemini API key - Người dùng cần thay thế bằng key của mình
-  final String _apiKey = 'AIzaSyB5MrC1o0EZlwOFdfQ2VtAMr2_7Y7-c3Zs';
+  
+  // Get API key from environment variables
+  String get _apiKey => dotenv.env['GEMINI_API_KEY'] ?? 'YOUR_GEMINI_API_KEY_HERE';
 
   @override
   void initState() {
@@ -92,10 +93,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
           '3. Thay thế _apiKey trong AIAssistantScreen';
     }
 
-    final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$_apiKey',
-    );
-
+    // Define system prompt once
     final systemPrompt =
         '''Bạn là một trợ lý AI chuyên về học ngoại ngữ, đặc biệt là tiếng Anh.
 Nhiệm vụ của bạn:
@@ -108,29 +106,75 @@ Nhiệm vụ của bạn:
 - Đưa ra lời khuyên học tập hiệu quả
 - Sử dụng emoji để làm cho câu trả lời sinh động hơn''';
 
-    final body = json.encode({
-      'contents': [
-        {
-          'parts': [
-            {'text': '$systemPrompt\n\nCâu hỏi của học sinh: $userMessage'},
+    // Try different model endpoints - using correct Gemini API format
+    final List<String> modelEndpoints = [
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$_apiKey',
+      'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=$_apiKey',
+      'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=$_apiKey',
+    ];
+    
+    Exception? lastError;
+    
+    for (final endpoint in modelEndpoints) {
+      try {
+        final url = Uri.parse(endpoint);
+
+        // Use the correct request format for Gemini API
+        final body = json.encode({
+          'contents': [
+            {
+              'parts': [
+                {'text': '$systemPrompt\n\nCâu hỏi của học sinh: $userMessage'},
+              ],
+            },
           ],
-        },
-      ],
-      'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 1024},
-    });
+          'generationConfig': {
+            'temperature': 0.7,
+            'maxOutputTokens': 1024,
+          },
+        });
 
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: body,
+        );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['candidates'][0]['content']['parts'][0]['text'];
-    } else {
-      throw Exception('API Error: ${response.statusCode} - ${response.body}');
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['candidates'] != null && 
+              data['candidates'].isNotEmpty &&
+              data['candidates'][0]['content'] != null &&
+              data['candidates'][0]['content']['parts'] != null &&
+              data['candidates'][0]['content']['parts'].isNotEmpty) {
+            return data['candidates'][0]['content']['parts'][0]['text'];
+          } else {
+            throw Exception('Invalid response format: ${response.body}');
+          }
+        } else {
+          final errorBody = response.body;
+          lastError = Exception('API Error: ${response.statusCode} - $errorBody');
+          // Continue to next endpoint
+          continue;
+        }
+      } catch (e) {
+        lastError = e is Exception ? e : Exception(e.toString());
+        // Continue to next endpoint
+        continue;
+      }
     }
+    
+    // If all endpoints failed, provide helpful error message
+    final errorMsg = lastError?.toString() ?? 'All API endpoints failed';
+    throw Exception(
+      'Không thể kết nối với Gemini API.\n\n'
+      'Lỗi: $errorMsg\n\n'
+      'Vui lòng kiểm tra:\n'
+      '1. API key có hợp lệ không\n'
+      '2. Kết nối internet\n'
+      '3. API key có quyền truy cập Gemini API không'
+    );
   }
 
   void _scrollToBottom() {

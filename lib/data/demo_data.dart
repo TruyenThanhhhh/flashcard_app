@@ -1,5 +1,5 @@
 import '../models/category.dart';
-import '../models/flashcart.dart';
+import '../models/flashcard.dart';
 import 'package:uuid/uuid.dart';
 
 final demoCategories = <Category>[
