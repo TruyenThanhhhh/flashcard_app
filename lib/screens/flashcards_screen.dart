@@ -1,13 +1,13 @@
-// lib/screens/flashcard_screen.dart
-
 import 'package:flutter/material.dart';
-import '../models/category.dart';
+// SỬA: Dùng model mới
+import '../models/flashcard_set.dart';
 import '../models/flashcard.dart';
-import '../services/firestore_service.dart'; // Giữ nguyên
+import '../services/firestore_service.dart';
 
 class FlashcardsScreen extends StatefulWidget {
-  final Category category;
-  const FlashcardsScreen({super.key, required this.category});
+  // SỬA: Nhận vào FlashcardSet
+  final FlashcardSet set;
+  const FlashcardsScreen({super.key, required this.set});
 
   @override
   State<FlashcardsScreen> createState() => _FlashcardsScreenState();
@@ -19,7 +19,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   bool showMeaning = false;
 
   void addOrEditFlashcard({Flashcard? card, int? editIndex}) {
-    // SỬA: Đổi tên biến để khớp với DB (front/back)
     final frontController = TextEditingController(text: card?.english ?? '');
     final backController = TextEditingController(text: card?.vietnamese ?? '');
     
@@ -31,13 +30,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: frontController, // Sửa
+              controller: frontController,
               decoration: const InputDecoration(labelText: 'Mặt trước (Tiếng Anh)'),
               autofocus: true,
               textInputAction: TextInputAction.next,
             ),
             TextField(
-              controller: backController, // Sửa
+              controller: backController,
               decoration: const InputDecoration(labelText: 'Mặt sau (Nghĩa)'),
             ),
           ],
@@ -46,15 +45,14 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
           ElevatedButton(
             onPressed: () async {
-              String front = frontController.text.trim(); // Sửa
-              String back = backController.text.trim();  // Sửa
+              String front = frontController.text.trim();
+              String back = backController.text.trim();
               if (front.isEmpty || back.isEmpty) return;
 
               try {
                 if (card != null && editIndex != null) {
-                  // SỬA: Gọi service Sửa
                   await _db.updateFlashcard(
-                    widget.category.id, // Đây là flashcardSetId
+                    widget.set.id, // SỬA
                     card.id,
                     front,
                     back,
@@ -62,16 +60,14 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Đã cập nhật thẻ!')));
                 } else {
-                  // SỬA: Gọi service Thêm
                   await _db.addFlashcard(
-                    widget.category.id, // Đây là flashcardSetId
+                    widget.set.id, // SỬA
                     front,
                     back,
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Đã thêm flashcard mới!')));
                 }
-                // Không cần setState vì StreamBuilder sẽ tự cập nhật
               } catch (e) {
                 ScaffoldMessenger.of(context)
                     .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
@@ -98,8 +94,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     try {
-                      // SỬA: Gọi service Xóa
-                      await _db.deleteFlashcard(widget.category.id, card.id);
+                      await _db.deleteFlashcard(widget.set.id, card.id); // SỬA
                       ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Đã xoá flashcard!')));
                     } catch (e) {
@@ -121,27 +116,18 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Flashcard>>(
-      //
-      // ===================================================================
-      // SỬA LỖI QUAN TRỌNG NHẤT:
-      // Dùng hàm trả về Stream (getFlashcardsStream)
-      // thay vì hàm trả về Future (getFlashcardsForCategory)
-      // ===================================================================
-      //
-      stream: _db.getFlashcardsStream(widget.category.id),
-      //
-      //
+      stream: _db.getFlashcardsStream(widget.set.id), // SỬA
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            appBar: AppBar(title: Text(widget.category.name)),
+            appBar: AppBar(title: Text(widget.set.title)), // SỬA
             body: const Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasError) {
           return Scaffold(
-            appBar: AppBar(title: Text(widget.category.name)),
+            appBar: AppBar(title: Text(widget.set.title)), // SỬA
             body: Center(child: Text('Lỗi: ${snapshot.error}')),
           );
         }
@@ -150,7 +136,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
         if (flashcards.isEmpty) {
           return Scaffold(
-            appBar: AppBar(title: Text(widget.category.name)),
+            appBar: AppBar(title: Text(widget.set.title)), // SỬA
             body: const Center(child: Text('Chủ đề này chưa có flashcard nào.')),
             floatingActionButton: FloatingActionButton(
               onPressed: () => addOrEditFlashcard(),
@@ -159,18 +145,16 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
           );
         }
 
-        // Đảm bảo currentIndex không bị lỗi
         if (currentIndex >= flashcards.length) {
           currentIndex = flashcards.isEmpty ? 0 : flashcards.length - 1;
         }
-
+        
         final card = flashcards[currentIndex];
-
+        
         return Scaffold(
-          appBar: AppBar(title: Text(widget.category.name)),
+          appBar: AppBar(title: Text(widget.set.title)), // SỬA
           body: Column(
             children: [
-              // ... (Phần nút 'Thêm thẻ mới' và 'Quản lý' giữ nguyên) ...
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -246,8 +230,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-
-              // ... (Phần GestureDetector và AnimatedSwitcher lật thẻ giữ nguyên) ...
               Expanded(
                 child: Center(
                   child: GestureDetector(
@@ -261,6 +243,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                         duration: const Duration(milliseconds: 550),
                         transitionBuilder:
                             (Widget child, Animation<double> animation) {
+                          // ... (Animation lật thẻ giữ nguyên)
                           final flipAnim =
                               Tween(begin: 0.0, end: 1.0).animate(animation);
                           return AnimatedBuilder(
@@ -310,7 +293,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            showMeaning ? card.vietnamese : card.english, // Giữ nguyên
+                            showMeaning ? card.vietnamese : card.english,
                             style: const TextStyle(
                                 fontSize: 28, fontWeight: FontWeight.bold),
                             textDirection: TextDirection.ltr,
@@ -322,8 +305,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                   ),
                 ),
               ),
-
-              // ... (Phần nút Quay lại / Tiếp theo giữ nguyên) ...
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

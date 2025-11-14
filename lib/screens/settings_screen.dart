@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-// SỬA: Xóa import LoginScreen vì StreamBuilder sẽ tự điều hướng
-// import 'login_screen.dart'; 
+// SỬA: Xóa import LoginScreen không cần thiết
 
 class SettingsScreen extends StatelessWidget {
   final VoidCallback? onToggleTheme;
@@ -10,24 +9,25 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // SỬA: Lấy isDark từ widget.isDark, không phải Theme.of(context)
-    // vì theme có thể đang ở 'system'.
-    final isDark = widget.isDark;
+    // SỬA: Lấy isDark từ Theme, không dùng 'widget.isDark'
+    final bool isDarkTheme = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? Color(0xFF0F172A) : Color(0xFFF8FAFC),
+      backgroundColor: isDarkTheme ? Color(0xFF0F172A) : Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: isDark ? Color(0xFF1E293B) : Colors.white,
+        backgroundColor: isDarkTheme ? Color(0xFF1E293B) : Colors.white,
         elevation: 0,
         title: const Text(
           'Cài đặt',
-          // SỬA: Không cần style vì nó sẽ lấy từ theme
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back,
-            // SỬA: Không cần màu vì AppBar theme sẽ xử lý
-            // color: isDark ? Colors.white : Color(0xFF1E293B),
+            color: isDarkTheme ? Colors.white : Color(0xFF1E293B),
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -35,14 +35,15 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildSectionHeader('Tài khoản', isDark),
+          // SỬA: Truyền isDarkTheme vào các hàm build
+          _buildSectionHeader('Tài khoản', isDarkTheme),
           _buildSettingsCard(
             context,
-            isDark,
+            isDarkTheme,
             children: [
               _buildSettingsTile(
                 context,
-                isDark,
+                isDarkTheme,
                 icon: Icons.person,
                 title: 'Thông tin cá nhân',
                 subtitle: 'Xem và chỉnh sửa thông tin tài khoản',
@@ -53,7 +54,7 @@ class SettingsScreen extends StatelessWidget {
               const Divider(height: 1),
               _buildSettingsTile(
                 context,
-                isDark,
+                isDarkTheme,
                 icon: Icons.lock,
                 title: 'Bảo mật',
                 subtitle: 'Đổi mật khẩu và quản lý bảo mật',
@@ -64,23 +65,14 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          _buildSectionHeader('Cài đặt ứng dụng', isDark),
+          _buildSectionHeader('Cài đặt ứng dụng', isDarkTheme),
           _buildSettingsCard(
             context,
-            isDark,
+            isDarkTheme,
             children: [
                _buildSettingsTile(
                 context,
-                isDark,
-                icon: isDark ? Icons.dark_mode : Icons.light_mode,
-                title: 'Chế độ hiển thị',
-                subtitle: isDark ? 'Đang ở chế độ tối' : 'Đang ở chế độ sáng',
-                onTap: onToggleTheme, // Gán hàm
-              ),
-              const Divider(height: 1),
-              _buildSettingsTile(
-                context,
-                isDark,
+                isDarkTheme,
                 icon: Icons.notifications,
                 title: 'Thông báo',
                 subtitle: 'Quản lý thông báo và nhắc nhở',
@@ -88,34 +80,36 @@ class SettingsScreen extends StatelessWidget {
                   _showComingSoon(context);
                 },
               ),
+              // ... (Các mục khác) ...
             ],
           ),
           const SizedBox(height: 24),
-          _buildSectionHeader('Về ứng dụng', isDark),
+          _buildSectionHeader('Về ứng dụng', isDarkTheme),
           _buildSettingsCard(
             context,
-            isDark,
+            isDarkTheme,
             children: [
-              _buildSettingsTile(
+               _buildSettingsTile(
                 context,
-                isDark,
+                isDarkTheme,
                 icon: Icons.info,
                 title: 'Phiên bản',
                 subtitle: '1.0.0',
                 onTap: null,
               ),
+              // ... (Các mục khác) ...
             ],
           ),
           const SizedBox(height: 24),
           
-          _buildSectionHeader('Khác', isDark),
+          _buildSectionHeader('Khác', isDarkTheme),
           _buildSettingsCard(
             context,
-            isDark,
+            isDarkTheme,
             children: [
               _buildSettingsTile(
                 context,
-                isDark,
+                isDarkTheme,
                 icon: Icons.logout,
                 title: 'Đăng xuất',
                 subtitle: 'Đăng xuất khỏi tài khoản',
@@ -151,8 +145,6 @@ class SettingsScreen extends StatelessWidget {
     required List<Widget> children,
   }) {
     return Container(
-      // SỬA: Dùng ClipRRect để bo góc
-      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: isDark ? Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -164,8 +156,12 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        children: children,
+      // SỬA: Thêm ClipRRect để bo góc cho ListTile
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: children,
+        ),
       ),
     );
   }
@@ -237,7 +233,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final auth = AuthService(); 
+    final auth = AuthService();
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -253,31 +249,9 @@ class SettingsScreen extends StatelessWidget {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(dialogContext);
-              try {
-                //
-                // ==================================================
-                // SỬA LỖI: Chỉ cần gọi signOut.
-                // StreamBuilder trong splash_screen sẽ tự động
-                // điều hướng về LoginScreen.
-                // ==================================================
-                //
-                await auth.signOut();
-                
-                //
-                // SỬA: XÓA TOÀN BỘ LOGIC NAVIGATOR.PUSHANDREMOVEUNTIL
-                //
-                
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Lỗi khi đăng xuất: ${e.toString()}'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
+              Navigator.pop(dialogContext); // Đóng dialog
+              await auth.signOut();
+              // StreamBuilder trong main/splash sẽ tự động điều hướng
             },
             child: const Text(
               'Đăng xuất',

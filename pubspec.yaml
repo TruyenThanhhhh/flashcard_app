@@ -45,4 +45,6 @@ flutter:
   # SỬA: Khai báo cả thư mục để dễ dàng thêm ảnh sau này
   # Hãy đảm bảo bạn tạo thư mục "assets/images/"
   assets:
+
+    - .env
     - assets/images/
