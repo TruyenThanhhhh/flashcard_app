@@ -1,5 +1,8 @@
+// lib/screens/quiz_mode_selection_screen.dart
+
 import 'package:flutter/material.dart';
-import '../models/category.dart';
+// SỬA: Dùng model mới
+import '../models/flashcard_set.dart'; 
 import 'quiz_screen.dart';
 
 enum QuizMode {
@@ -8,8 +11,9 @@ enum QuizMode {
 }
 
 class QuizModeSelectionScreen extends StatelessWidget {
-  final Category category;
-  const QuizModeSelectionScreen({super.key, required this.category});
+  // SỬA: Nhận vào FlashcardSet
+  final FlashcardSet set;
+  const QuizModeSelectionScreen({super.key, required this.set});
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +58,7 @@ class QuizModeSelectionScreen extends StatelessWidget {
                     Icon(Icons.quiz, color: Colors.white, size: 48),
                     const SizedBox(height: 16),
                     Text(
-                      category.name,
+                      set.title, // SỬA: Dùng title
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -64,7 +68,7 @@ class QuizModeSelectionScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${category.cards.length} câu hỏi',
+                      '${set.cardCount} câu hỏi', // SỬA: Dùng cardCount
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.white.withOpacity(0.9),
@@ -100,7 +104,7 @@ class QuizModeSelectionScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => QuizScreen(
-                        category: category,
+                        set: set, // SỬA: Truyền 'set'
                         mode: QuizMode.multipleChoice,
                       ),
                     ),
@@ -123,7 +127,7 @@ class QuizModeSelectionScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => QuizScreen(
-                        category: category,
+                        set: set, // SỬA: Truyền 'set'
                         mode: QuizMode.fillInTheBlank,
                       ),
                     ),
@@ -147,6 +151,7 @@ class QuizModeSelectionScreen extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
+    // ... (Toàn bộ UI của hàm này giữ nguyên, không cần sửa) ...
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -212,4 +217,3 @@ class QuizModeSelectionScreen extends StatelessWidget {
     );
   }
 }
-

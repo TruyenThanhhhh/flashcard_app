@@ -1,30 +1,22 @@
 import 'package:flutter/material.dart';
-import 'screens/splash_screen.dart';
-
-// SỬA CÁC DÒNG IMPORT
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Giữ lại
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'firebase_options.dart';
-import 'screens/home_screen.dart';
-import 'screens/splash_screen.dart';
-import 'screens/login_screen.dart'; // Import Login Screen
-import 'services/auth_service.dart'; // Import Auth Service
+import 'screens/splash_screen.dart'; // Chỉ cần import file này
 
 // Hàm main đã được cập nhật
 void main() async {
-  // Đảm bảo Flutter đã sẵn sàng
   WidgetsFlutterBinding.ensureInitialized();
   
-  await dotenv.load(fileName: ".env");
+  // Giữ lại .env nếu bạn cần
+  await dotenv.load(fileName: ".env"); 
 
-  // Khởi tạo Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  print("✅ Firebase Initialized!"); // Thông báo đã kết nối thành công
+  print("✅ Firebase Initialized!");
   
-  // Chạy ứng dụng
   runApp(const FlashcardApp());
 }
 
@@ -36,15 +28,19 @@ class FlashcardApp extends StatefulWidget {
 }
 
 class _FlashcardAppState extends State<FlashcardApp> {
-  ThemeMode themeMode = ThemeMode.light;
-
-  // Thêm một Future để giả lập thời gian chờ của Splash Screen
-  final Future<void> _splashScreenDelay = Future.delayed(const Duration(seconds: 3));
+  // Logic theme giữ nguyên
+  ThemeMode themeMode = ThemeMode.system; // SỬA: Dùng 'system' làm mặc định
 
   void toggleTheme() {
     setState(() {
-      themeMode =
-          themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+      if (themeMode == ThemeMode.system) {
+        // Lấy theme hiện tại của hệ thống để quyết định
+        final brightness = MediaQuery.of(context).platformBrightness;
+        themeMode = brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark;
+      } else {
+        themeMode =
+            themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+      }
     });
   }
 
@@ -57,24 +53,30 @@ class _FlashcardAppState extends State<FlashcardApp> {
 
       // --- Theme và DarkTheme của bạn giữ nguyên ---
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.indigo,
+          brightness: Brightness.light,
+        ),
         brightness: Brightness.light,
+        scaffoldBackgroundColor: Color(0xFFF8FAFC), // Sửa: Dùng màu nhạt
         visualDensity: VisualDensity.adaptivePlatformDensity,
         cardTheme: const CardThemeData(
-          color: Color(0xFFE8EAF6),
+          color: Colors.white, // Sửa: Dùng màu trắng
           margin: EdgeInsets.all(10),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(18)),
           ),
-          elevation: 4,
+          elevation: 2, // Sửa: Giảm elevation
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.indigo,
+          backgroundColor: Colors.white, // Sửa
           elevation: 1,
+          scrolledUnderElevation: 1,
+          iconTheme: IconThemeData(color: Colors.black87),
           titleTextStyle: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
-            color: Colors.white,
+            color: Colors.black87, // Sửa
           ),
         ),
         textTheme: const TextTheme(
@@ -82,6 +84,7 @@ class _FlashcardAppState extends State<FlashcardApp> {
         ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: Colors.indigo,
+          foregroundColor: Colors.white, // MỚI: Thêm màu icon
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
@@ -99,17 +102,20 @@ class _FlashcardAppState extends State<FlashcardApp> {
           seedColor: Colors.indigo,
           brightness: Brightness.dark,
         ),
-        scaffoldBackgroundColor: Colors.black,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: Color(0xFF0F172A), // Sửa: Dùng màu nền tối
         cardTheme: const CardThemeData(
-          color: Color(0xFF212121),
+          color: Color(0xFF1E293B), // Sửa
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(18)),
           ),
-          elevation: 2,
+          elevation: 1,
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
+          backgroundColor: Color(0xFF1E293B), // Sửa
           elevation: 1,
+          scrolledUnderElevation: 1,
+          iconTheme: IconThemeData(color: Colors.white),
           titleTextStyle: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
@@ -120,52 +126,24 @@ class _FlashcardAppState extends State<FlashcardApp> {
           titleLarge:
               TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          backgroundColor: Colors.indigo,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
+        ),
       ),
       // --- HẾT PHẦN THEME ---
 
-      // Sửa đổi 'home' để điều hướng logic
-      home: FutureBuilder(
-        future: _splashScreenDelay,
-        builder: (context, snapshot) {
-          // Khi Future đang chạy (đang chờ 3s), hiển thị SplashScreen
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SplashScreen();
-          }
-
-          // Khi Future hoàn thành (đã chờ 3s), hiển thị AuthWrapper
-          // AuthWrapper sẽ tự quyết định vào Login hay Home
-          return const AuthWrapper();
-        },
+      // SỬA: Đã xóa FutureBuilder và AuthWrapper
+      // home: sẽ gọi thẳng SplashScreen và truyền logic theme vào
+      home: SplashScreen(
+        onToggleTheme: toggleTheme,
+        isDark: themeMode == ThemeMode.dark ||
+                (themeMode == ThemeMode.system &&
+                    MediaQuery.of(context).platformBrightness == Brightness.dark),
       ),
-    );
-  }
-}
-
-// Widget mới để kiểm tra trạng thái đăng nhập
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // Dùng StreamBuilder để lắng nghe thay đổi trạng thái đăng nhập
-    return StreamBuilder<User?>(
-      stream: AuthService().authStateChanges, // Lấy stream từ AuthService
-      builder: (context, snapshot) {
-        // Đang chờ kết nối (ví dụ: đang lấy token)
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        // Đã có dữ liệu
-        if (snapshot.hasData) {
-          // Nếu snapshot.data có dữ liệu (User), nghĩa là đã đăng nhập
-          return const HomeScreen();
-        }
-
-        return const LoginScreen();
-      },
     );
   }
 }
