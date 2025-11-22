@@ -1,8 +1,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- MỚI: CÁC QUYỀN CẦN THIẾT CHO THÔNG BÁO -->
+    <!-- Quyền nhận thông báo khởi động lại máy để lên lịch lại -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Quyền rung -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Quyền hiển thị thông báo (Bắt buộc cho Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Quyền lên lịch chính xác (Bắt buộc cho Android 12+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    
+    <!-- Quyền Internet (Thường mặc định có, nhưng khai báo cho chắc chắn) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
-        android:label="flashcard_app"
+        android:label="StudyMate"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,12 +40,27 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+            
+        <!-- MỚI: CẤU HÌNH RECEIVER ĐỂ THÔNG BÁO HOẠT ĐỘNG KHI KHỞI ĐỘNG LẠI MÁY -->
+        <!-- Đây là phần quan trọng để thông báo đã lên lịch không bị mất khi tắt máy -->
+        <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+        
     </application>
+    
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.

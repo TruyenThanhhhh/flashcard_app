@@ -31,13 +31,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
           children: [
             TextField(
               controller: frontController,
-              decoration: const InputDecoration(labelText: 'Mặt trước (Tiếng Anh)'),
+              decoration: const InputDecoration(labelText: 'Mặt trước'),
               autofocus: true,
               textInputAction: TextInputAction.next,
             ),
             TextField(
               controller: backController,
-              decoration: const InputDecoration(labelText: 'Mặt sau (Nghĩa)'),
+              decoration: const InputDecoration(labelText: 'Mặt sau'),
             ),
           ],
         ),

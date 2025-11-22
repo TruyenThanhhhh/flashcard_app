@@ -5,8 +5,8 @@ import '../services/firestore_service.dart';
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
 
+  // Hàm format thời gian hiển thị "x phút trước", "y giờ trước"
   String _formatTime(DateTime timestamp) {
-    // Hàm format ngày tháng đơn giản
     final now = DateTime.now();
     final difference = now.difference(timestamp);
 
@@ -29,15 +29,8 @@ class NotificationScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: Text(
           'Thông báo',
           style: TextStyle(
@@ -45,13 +38,18 @@ class NotificationScreen extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
-            icon: Icon(Icons.done_all, color: Colors.indigo),
+            icon: const Icon(Icons.done_all, color: Colors.indigo),
             tooltip: 'Đánh dấu tất cả đã đọc',
-            onPressed: () {
-              db.markAllNotificationsAsRead();
-            },
+            onPressed: () => db.markAllNotificationsAsRead(),
           ),
         ],
       ),
@@ -127,6 +125,7 @@ class NotificationScreen extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
+            // Thông báo chưa đọc sẽ có nền trắng (hoặc tối), đã đọc thì trong suốt
             color: notification.isRead
                 ? (isDark ? Colors.transparent : Colors.transparent)
                 : (isDark ? const Color(0xFF1E293B) : Colors.white),
@@ -134,6 +133,7 @@ class NotificationScreen extends StatelessWidget {
             border: Border.all(
               color: isDark ? Colors.white10 : Colors.grey.shade200,
             ),
+            // Thông báo chưa đọc sẽ có bóng đổ
             boxShadow: notification.isRead
                 ? null
                 : [
@@ -172,6 +172,7 @@ class NotificationScreen extends StatelessWidget {
                             ),
                           ),
                         ),
+                        // Chấm đỏ nếu chưa đọc
                         if (!notification.isRead)
                           Container(
                             width: 10,
@@ -209,6 +210,7 @@ class NotificationScreen extends StatelessWidget {
     );
   }
 
+  // Icon thay đổi tùy theo loại thông báo
   Widget _buildIcon(String type) {
     IconData iconData;
     Color color;

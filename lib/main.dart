@@ -1,19 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/auth_wrapper.dart'; // SỬA: Import AuthWrapper
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/auth_wrapper.dart'; 
+import 'services/notification_service.dart'; // Import NotificationService
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // 1. Tải biến môi trường (API Key)
   await dotenv.load(fileName: ".env"); 
 
+  // 2. Khởi tạo Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 3. Khởi tạo Notifications & Xin quyền
+  final notificationService = NotificationService();
+  await notificationService.init();
+  await notificationService.requestPermissions();
   
-  print("✅ Firebase Initialized!");
+  print("✅ System Initialized!");
   
   runApp(const FlashcardApp());
 }
@@ -26,6 +34,7 @@ class FlashcardApp extends StatefulWidget {
 }
 
 class _FlashcardAppState extends State<FlashcardApp> {
+  // Mặc định là chế độ sáng
   ThemeMode themeMode = ThemeMode.light;
 
   void toggleTheme() {
@@ -42,45 +51,45 @@ class _FlashcardAppState extends State<FlashcardApp> {
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
 
-      // --- Theme (SỬA: Đã xóa các 'const' không hợp lệ) ---
+      // --- LIGHT THEME ---
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.indigo,
           brightness: Brightness.light,
         ),
         brightness: Brightness.light,
-        scaffoldBackgroundColor: Color(0xFFF8FAFC),
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         visualDensity: VisualDensity.adaptivePlatformDensity,
-        cardTheme: CardThemeData( // SỬA: Xóa const
+        cardTheme: CardThemeData(
           color: Colors.white,
-          margin: const EdgeInsets.all(10), // 'const' ở đây thì OK
+          margin: const EdgeInsets.all(10),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18), // SỬA: Xóa const
+            borderRadius: BorderRadius.circular(18),
           ),
           elevation: 2,
         ),
-        appBarTheme: AppBarTheme( // SỬA: Xóa const
+        appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           elevation: 1,
           scrolledUnderElevation: 1,
-          iconTheme: const IconThemeData(color: Colors.black87), // 'const' ở đây thì OK
-          titleTextStyle: const TextStyle( // SỬA: Xóa const
+          iconTheme: IconThemeData(color: Colors.black87),
+          titleTextStyle: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
             color: Colors.black87,
           ),
         ),
-        textTheme: const TextTheme( // 'const' ở đây thì OK
+        textTheme: const TextTheme(
           titleLarge: TextStyle(fontWeight: FontWeight.bold),
         ),
-        floatingActionButtonTheme: FloatingActionButtonThemeData( // SỬA: Xóa const
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
           backgroundColor: Colors.indigo,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16), // SỬA: Xóa const
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
-        snackBarTheme: const SnackBarThemeData( // 'const' ở đây thì OK
+        snackBarTheme: const SnackBarThemeData(
           backgroundColor: Colors.indigo,
           contentTextStyle: TextStyle(
             color: Colors.white,
@@ -88,22 +97,23 @@ class _FlashcardAppState extends State<FlashcardApp> {
           ),
         ),
       ),
-      // --- DarkTheme (SỬA: Đã xóa các 'const' không hợp lệ) ---
+
+      // --- DARK THEME ---
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.indigo,
           brightness: Brightness.dark,
         ),
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Color(0xFF0F172A),
-        cardTheme: CardThemeData( // SỬA: Xóa const
-          color: Color(0xFF1E293B),
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        cardTheme: CardThemeData(
+          color: const Color(0xFF1E293B),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18), // SỬA: Xóa const
+            borderRadius: BorderRadius.circular(18),
           ),
           elevation: 1,
         ),
-        appBarTheme: const AppBarTheme( // 'const' ở đây thì OK
+        appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF1E293B),
           elevation: 1,
           scrolledUnderElevation: 1,
@@ -114,19 +124,20 @@ class _FlashcardAppState extends State<FlashcardApp> {
             color: Colors.white,
           ),
         ),
-        textTheme: const TextTheme( // 'const' ở đây thì OK
+        textTheme: const TextTheme(
           titleLarge:
               TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        floatingActionButtonTheme: FloatingActionButtonThemeData( // SỬA: Xóa const
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
           backgroundColor: Colors.indigo,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16), // SỬA: Xóa const
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),
       
+      // SỬA: Gọi AuthWrapper để xử lý luồng đăng nhập/splash
       home: AuthWrapper(
         onToggleTheme: toggleTheme,
         isDark: themeMode == ThemeMode.dark,
