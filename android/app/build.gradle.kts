@@ -13,6 +13,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+
+        // 🔥 Kotlin DSL phải dùng cú pháp này
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -29,12 +32,12 @@ android {
 
     buildTypes {
         release {
-            // ✅ Tạm thời dùng debug key cho build release (phục vụ test)
             signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
-flutter {
-    source = "../.."
+dependencies {
+    // 🔥 Desugaring lib phải nằm trong dependencies
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

@@ -28,11 +28,6 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         ChatMessage(
           text:
               'Xin chào! 👋\n\nTôi là trợ lý AI của bạn. Tôi có thể giúp bạn:\n\n'
-              '📚 Giải thích ngữ pháp\n'
-              '💡 Gợi ý từ vựng mới\n'
-              '✍️ Tạo câu ví dụ\n'
-              '🗣️ Luyện hội thoại\n'
-              '❓ Trả lời thắc mắc về tiếng Anh\n\n'
               'Hãy hỏi tôi bất cứ điều gì!',
           isUser: false,
           timestamp: DateTime.now(),

@@ -1,7 +1,4 @@
-// lib/screens/quiz_mode_selection_screen.dart
-
 import 'package:flutter/material.dart';
-// SỬA: Dùng model mới
 import '../models/flashcard_set.dart'; 
 import 'quiz_screen.dart';
 
@@ -11,7 +8,6 @@ enum QuizMode {
 }
 
 class QuizModeSelectionScreen extends StatelessWidget {
-  // SỬA: Nhận vào FlashcardSet
   final FlashcardSet set;
   const QuizModeSelectionScreen({super.key, required this.set});
 
@@ -20,20 +16,20 @@ class QuizModeSelectionScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? Color(0xFF0F172A) : Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: isDark ? Color(0xFF1E293B) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0,
         title: Text(
           'Chọn chế độ Quiz',
           style: TextStyle(
-            color: isDark ? Colors.white : Color(0xFF1E293B),
+            color: isDark ? Colors.white : const Color(0xFF1E293B),
           ),
         ),
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back,
-            color: isDark ? Colors.white : Color(0xFF1E293B),
+            color: isDark ? Colors.white : const Color(0xFF1E293B),
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -46,29 +42,41 @@ class QuizModeSelectionScreen extends StatelessWidget {
             children: [
               // Header
               Container(
+                width: double.infinity, // Đảm bảo container chiếm hết chiều ngang
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: const LinearGradient(
                     colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                   ),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Column(
                   children: [
-                    Icon(Icons.quiz, color: Colors.white, size: 48),
+                    const Icon(Icons.quiz, color: Colors.white, size: 48),
                     const SizedBox(height: 16),
-                    Text(
-                      set.title, // SỬA: Dùng title
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    
+                    // 🔥 FIX LỖI TRÀN TEXT CHO TIÊU ĐỀ
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 300),
+                        child: Text(
+                          set.title,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 3, // Giới hạn tối đa 3 dòng
+                          overflow: TextOverflow.ellipsis, // Thêm dấu ... nếu vẫn tràn
+                        ),
                       ),
-                      textAlign: TextAlign.center,
                     ),
+                    
                     const SizedBox(height: 8),
                     Text(
-                      '${set.cardCount} câu hỏi', // SỬA: Dùng cardCount
+                      '${set.cardCount} câu hỏi',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.white.withOpacity(0.9),
@@ -85,7 +93,7 @@ class QuizModeSelectionScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Color(0xFF1E293B),
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
               ),
               const SizedBox(height: 24),
@@ -104,7 +112,7 @@ class QuizModeSelectionScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => QuizScreen(
-                        set: set, // SỬA: Truyền 'set'
+                        set: set,
                         mode: QuizMode.multipleChoice,
                       ),
                     ),
@@ -127,7 +135,7 @@ class QuizModeSelectionScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => QuizScreen(
-                        set: set, // SỬA: Truyền 'set'
+                        set: set,
                         mode: QuizMode.fillInTheBlank,
                       ),
                     ),
@@ -157,7 +165,7 @@ class QuizModeSelectionScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: isDark ? Color(0xFF1E293B) : Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: color.withOpacity(0.3),
@@ -191,8 +199,10 @@ class QuizModeSelectionScreen extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Color(0xFF1E293B),
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -201,6 +211,8 @@ class QuizModeSelectionScreen extends StatelessWidget {
                       fontSize: 14,
                       color: isDark ? Colors.grey[400] : Colors.grey[600],
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

@@ -17,6 +17,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   final FirestoreService _db = FirestoreService();
   late Future<List<Map<String, dynamic>>> _weeklyDataFuture;
   late Future<List<QueryDocumentSnapshot>> _recentSessionsFuture;
+  
+  // Biến lưu số lượng bộ đề (Sets)
+  int _totalSets = 0;
 
   @override
   void initState() {
@@ -27,6 +30,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   void _refreshData() {
     _weeklyDataFuture = _db.getWeeklyStudyData();
     _recentSessionsFuture = _db.getRecentSessions(5);
+    
+    // Gọi hàm đếm số lượng bộ đề từ FirestoreService
+    _db.getFlashcardSetsCount().then((value) {
+      if (mounted) {
+        setState(() {
+          _totalSets = value;
+        });
+      }
+    });
   }
 
   @override
@@ -37,9 +49,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        setState(() {
-          _refreshData();
-        });
+        _refreshData();
+        // Đợi một chút để UI cập nhật
+        await Future.delayed(const Duration(milliseconds: 500));
       },
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -53,24 +65,30 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Grid 2x2 thống kê
-          GridView.count(
-            crossAxisCount: 2,
+          // GridView Thống kê (Đã fix lỗi overflow)
+          GridView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            // 🔥 SỬA LỖI 1: Giảm tỷ lệ để thẻ cao hơn (1.5 -> 1.3 hoặc 1.2)
-            childAspectRatio: 1.3, 
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              mainAxisExtent: 120, // Cố định chiều cao thẻ
+            ),
             children: [
               _buildStatCard('Chuỗi ngày', '${widget.userStats['streak'] ?? 0}',
                   Icons.local_fire_department, Colors.orange, isDark),
+              
               _buildStatCard('Tổng giờ',
                   '${(widget.userStats['totalHours'] as num? ?? 0).toStringAsFixed(1)}h',
                   Icons.timer, Colors.green, isDark),
-              _buildStatCard('Flashcards',
-                  '${widget.userStats['totalFlashcards'] ?? 0}',
-                  Icons.style, Colors.blue, isDark),
+              
+              // 🔥 Cập nhật: Hiển thị số Bộ đề thay vì Flashcards
+              _buildStatCard('Bộ đề', 
+                  '$_totalSets', 
+                  Icons.folder_copy, // Icon folder
+                  Colors.blue, isDark),
+                  
               _buildStatCard('Ghi chú',
                   '${widget.userStats['totalNotes'] ?? 0}',
                   Icons.edit_note, Colors.purple, isDark),
@@ -108,15 +126,21 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   return const Center(child: Text("Chưa có dữ liệu tuần này"));
                 }
 
-                final maxY = snapshot.data!
-                        .map((e) => e['hours'] as double)
-                        .reduce(max) *
-                    1.2;
+                double maxY = 5.0;
+                try {
+                  final maxData = snapshot.data!
+                      .map((e) => (e['hours'] as num).toDouble())
+                      .reduce(max);
+                  maxY = maxData * 1.2;
+                } catch (e) {
+                  maxY = 5.0;
+                }
+                if (maxY == 0) maxY = 5.0;
 
                 return BarChart(
                   BarChartData(
                     alignment: BarChartAlignment.spaceAround,
-                    maxY: maxY > 0 ? maxY + 0.5 : 5.0, // Fix crash nếu max = 0
+                    maxY: maxY + 0.5,
                     barTouchData: BarTouchData(
                       touchTooltipData: BarTouchTooltipData(
                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -134,7 +158,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           showTitles: true,
                           getTitlesWidget: (value, meta) {
                             final index = value.toInt();
-                             if (index >= snapshot.data!.length) return const SizedBox(); // Safety check
+                            if (index < 0 || index >= snapshot.data!.length) {
+                              return const SizedBox();
+                            }
                             final date = snapshot.data![index]['day'] as DateTime;
                             return Padding(
                               padding: const EdgeInsets.only(top: 8.0),
@@ -155,18 +181,19 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     barGroups: snapshot.data!.asMap().entries.map((entry) {
                       final index = entry.key;
                       final data = entry.value;
+                      final hours = (data['hours'] as num).toDouble();
 
                       return BarChartGroupData(
                         x: index,
                         barRods: [
                           BarChartRodData(
-                            toY: data['hours'] as double,
+                            toY: hours,
                             color: Colors.indigo,
                             width: 16,
                             borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                             backDrawRodData: BackgroundBarChartRodData(
                               show: true,
-                              toY: 5,
+                              toY: maxY,
                               color: isDark ? Colors.white10 : Colors.grey.shade100,
                             ),
                           ),
@@ -221,7 +248,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 itemBuilder: (context, index) {
                   final data = docs[index].data() as Map<String, dynamic>;
                   final isQuiz = data['type'] == 'quiz';
-                  final date = (data['timestamp'] as Timestamp).toDate();
+                  final timestamp = data['timestamp'];
+                  final date = (timestamp is Timestamp) ? timestamp.toDate() : DateTime.now();
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -281,12 +309,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 
-  // 🔥 SỬA LỖI 2: Widget thẻ thống kê được tối ưu
+  // Widget thẻ thống kê đã tối ưu
   Widget _buildStatCard(
       String title, String value, IconData icon, Color color, bool isDark) {
     return Container(
-      // Giảm padding một chút để tránh overflow
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -294,26 +321,33 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 4), // Giảm khoảng cách
+          Icon(icon, color: color, size: 26),
+          const SizedBox(height: 6),
           
-          // Dùng FittedBox để số to tự thu nhỏ thay vì gây lỗi
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
               ),
             ),
           ),
           
+          const SizedBox(height: 4),
+          
           Text(
             title,
-            style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+            style: TextStyle(
+              fontSize: 12, 
+              color: isDark ? Colors.grey[400] : Colors.grey[600]
+            ),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

@@ -1,14 +1,10 @@
-// lib/screens/quiz_screen.dart
-
 import 'package:flutter/material.dart';
-// SỬA: Dùng model mới
-import '../models/flashcard_set.dart'; 
+import '../models/flashcard_set.dart';
 import '../models/flashcard.dart';
 import '../services/firestore_service.dart';
 import 'quiz_mode_selection_screen.dart';
 
 class QuizScreen extends StatefulWidget {
-  // SỬA: Nhận vào FlashcardSet
   final FlashcardSet set;
   final QuizMode mode;
   const QuizScreen({super.key, required this.set, required this.mode});
@@ -18,13 +14,10 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-  // SỬA: Khởi tạo service
   final FirestoreService _db = FirestoreService();
   
-  // MỚI: State cho FutureBuilder
   late Future<List<Flashcard>> _cardsFuture;
 
-  // SỬA: Các biến này sẽ được khởi tạo SAU KHI Future hoàn thành
   late List<Flashcard> cards;
   int current = 0;
   int score = 0;
@@ -33,7 +26,7 @@ class _QuizScreenState extends State<QuizScreen> {
   late List<int> questionOrder;
   List<List<String>> options = [];
   DateTime? _sessionStartTime;
-  bool _isQuizInitialized = false; // Flag để tránh khởi tạo lại
+  bool _isQuizInitialized = false;
 
   @override
   void initState() {
@@ -41,7 +34,11 @@ class _QuizScreenState extends State<QuizScreen> {
     _sessionStartTime = DateTime.now();
     
     // MỚI: Bắt đầu tải thẻ ngay lập tức
-    _cardsFuture = _db.getFlashcardsOnce(widget.set.id); // Dùng hàm đã thêm
+    // Nếu là bài học công khai, truyền userId để lấy từ user khác
+    _cardsFuture = _db.getFlashcardsOnce(
+      widget.set.id,
+      userId: widget.set.isPublic ? widget.set.userId : null,
+    );
     
     // BỎ: Toàn bộ logic chuẩn bị quiz sẽ được dời đi
     // cards = [...widget.category.cards];
@@ -49,14 +46,12 @@ class _QuizScreenState extends State<QuizScreen> {
     // options = ...
   }
   
-  // MỚI: Hàm khởi tạo logic quiz sau khi tải xong thẻ
   void _initializeQuiz(List<Flashcard> loadedCards) {
-    cards = [...loadedCards]; // Gán thẻ đã tải
+    cards = [...loadedCards];
     questionOrder = List.generate(cards.length, (i) => i)..shuffle();
     
-    // Chuẩn bị options cho trắc nghiệm
     if (widget.mode == QuizMode.multipleChoice) {
-      options = []; // Xóa options cũ (nếu có)
+      options = [];
       for(final idx in questionOrder) {
         if(cards.length >= 4) {
           final correct = cards[idx].vietnamese;
@@ -67,15 +62,12 @@ class _QuizScreenState extends State<QuizScreen> {
           optionList.shuffle();
           options.add(optionList);
         } else if (cards.length > 0) {
-          // Xử lý trường hợp có ít hơn 4 thẻ
           final correct = cards[idx].vietnamese;
           var allOptions = cards.map((c) => c.vietnamese).toList();
           while (allOptions.length < 4) {
-             // Lặp lại các lựa chọn cho đủ 4
              allOptions.addAll(cards.map((c) => c.vietnamese));
           }
           allOptions.shuffle();
-          // Đảm bảo đáp án đúng luôn có
           if (!allOptions.contains(correct)) {
             allOptions[0] = correct;
           }
@@ -85,9 +77,8 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
     }
-    _isQuizInitialized = true; // Đánh dấu đã khởi tạo
+    _isQuizInitialized = true;
   }
-
 
   void onSelect(int optionIdx) {
     setState(() { selected = optionIdx; showResult = true; });
@@ -98,34 +89,35 @@ class _QuizScreenState extends State<QuizScreen> {
       if (current < cards.length-1) {
         setState((){ current++; showResult=false; selected=null; });
       } else {
-        _showQuizSummary(); // SỬA: Đổi tên hàm
+        _showQuizSummary();
       }
     });
   }
 
-  // SỬA: Đổi tên hàm
   Future<void> _showQuizSummary() async {
     if (_sessionStartTime != null) {
       final duration = DateTime.now().difference(_sessionStartTime!);
       try {
         await _db.recordQuizSession(
-          categoryId: widget.set.id, // SỬA
-          categoryName: widget.set.title, // SỬA
+          categoryId: widget.set.id,
+          categoryName: widget.set.title,
           duration: duration,
           quizScore: score,
           totalQuestions: cards.length,
         );
       } catch (e) {
-        print("Lỗi khi lưu Quiz: $e");
+        debugPrint("Lỗi khi lưu Quiz: $e");
       }
     }
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Bạn đã hoàn thành quiz!')),
     );
     showDialog(
       context: context,
-      barrierDismissible: false, // Thêm
+      barrierDismissible: false,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Hoàn thành Quiz'),
@@ -160,18 +152,16 @@ class _QuizScreenState extends State<QuizScreen> {
       if (current < cards.length-1) {
         setState((){ current++; showResult=false; });
       } else {
-        _showQuizSummary(); // SỬA: Đổi tên hàm
+        _showQuizSummary();
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // SỬA: Dùng FutureBuilder
     return FutureBuilder<List<Flashcard>>(
       future: _cardsFuture,
       builder: (context, snapshot) {
-        // 1. Đang tải
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
             appBar: AppBar(title: Text(widget.set.title)),
@@ -179,7 +169,6 @@ class _QuizScreenState extends State<QuizScreen> {
           );
         }
 
-        // 2. Bị lỗi
         if (snapshot.hasError) {
           return Scaffold(
             appBar: AppBar(title: Text(widget.set.title)),
@@ -187,7 +176,6 @@ class _QuizScreenState extends State<QuizScreen> {
           );
         }
 
-        // 3. Tải xong, không có thẻ
         final loadedCards = snapshot.data ?? [];
         if (loadedCards.isEmpty) {
           return Scaffold(
@@ -196,13 +184,10 @@ class _QuizScreenState extends State<QuizScreen> {
           );
         }
 
-        // 4. MỚI: Khởi tạo state của quiz (chỉ 1 lần)
         if (!_isQuizInitialized) {
           _initializeQuiz(loadedCards);
         }
         
-        // 5. Build UI chính
-        // (Kiểm tra lại phòng trường hợp state chưa kịp build)
         if (!_isQuizInitialized) {
            return Scaffold(
             appBar: AppBar(title: Text(widget.set.title)),
@@ -215,21 +200,20 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  // MỚI: Tách UI chính ra
   Widget _buildQuizUI(BuildContext context) {
     final card = cards[questionOrder[current]];
     final isMultipleChoice = widget.mode == QuizMode.multipleChoice;
     
     return Scaffold(
       appBar: AppBar(
-        title: Text('Quiz: ${widget.set.title}'), // SỬA
+        title: Text('Quiz: ${widget.set.title}'),
         actions: [
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.grey.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -267,10 +251,8 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildMultipleChoiceView(Flashcard card) {
-    // ... (Giữ nguyên toàn bộ logic UI) ...
-    // Thêm kiểm tra options có rỗng không
     if (options.isEmpty || options.length <= current) {
-      return Center(child: Text("Đang tạo câu hỏi..."));
+      return const Center(child: Text("Đang tạo câu hỏi..."));
     }
     
     final cardOptions = options[current];
@@ -280,20 +262,39 @@ class _QuizScreenState extends State<QuizScreen> {
       children: [
         Text('Câu hỏi ${current+1}/${cards.length}', style: const TextStyle(fontSize: 20)),
         const SizedBox(height: 18),
+        
+        // 🔥 FIX: Card hiển thị câu hỏi với kích thước cố định và tự co chữ
         Card(
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal:16.0, vertical:20),
-            child: Text(card.english, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+          child: Container(
+            width: 320,
+            height: 180, // Cố định chiều cao để không bị nhảy layout
+            padding: const EdgeInsets.all(16),
+            alignment: Alignment.center,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 290),
+                child: Text(
+                  card.english,
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
           ),
         ),
+        
         const SizedBox(height: 30),
-        ...List.generate(cardOptions.length, (i) => Padding( // SỬA: Dùng cardOptions.length
+        ...List.generate(cardOptions.length, (i) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              minimumSize: const Size(230,50),
+              minimumSize: const Size(280, 55),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               elevation: 2,
               backgroundColor: showResult
@@ -303,7 +304,14 @@ class _QuizScreenState extends State<QuizScreen> {
                 : null,
             ),
             onPressed: showResult ? null : () => onSelect(i),
-            child: Text(options[current][i], style: const TextStyle(fontSize: 20)),
+            // 🔥 FIX: Text trong nút đáp án cũng tự xuống dòng hoặc co nhỏ
+            child: Text(
+              options[current][i], 
+              style: const TextStyle(fontSize: 18),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         )),
       ],
@@ -311,7 +319,6 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 }
 
-// Lớp QuizTextAnswer (Giữ nguyên, không thay đổi)
 class QuizTextAnswer extends StatefulWidget {
   final Flashcard card;
   final bool show;
@@ -343,12 +350,10 @@ class _QuizTextAnswerState extends State<QuizTextAnswer> {
   @override
   void didUpdateWidget(QuizTextAnswer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reset when moving to next question
     if (oldWidget.show && !widget.show) {
       ctl.clear();
       isCorrect = false;
     }
-    // Check answer when result is shown
     if (!oldWidget.show && widget.show && ctl.text.isNotEmpty) {
       isCorrect = ctl.text.trim().toLowerCase() == widget.card.vietnamese.trim().toLowerCase();
     }
@@ -361,7 +366,7 @@ class _QuizTextAnswerState extends State<QuizTextAnswer> {
   
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView( // Thêm scroll view để tránh bàn phím che
       padding: const EdgeInsets.all(24.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -371,17 +376,32 @@ class _QuizTextAnswerState extends State<QuizTextAnswer> {
             style: const TextStyle(fontSize: 20),
           ),
           const SizedBox(height: 30),
+          
+          // 🔥 FIX: Card hiển thị câu hỏi (tương tự phần trắc nghiệm)
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20),
-              child: Text(
-                widget.card.english,
-                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            child: Container(
+              width: double.infinity,
+              height: 180,
+              padding: const EdgeInsets.all(16),
+              alignment: Alignment.center,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 300),
+                  child: Text(
+                    widget.card.english,
+                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                    maxLines: 5,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ),
             ),
           ),
+          
           const SizedBox(height: 40),
           SizedBox(
             width: 300,
