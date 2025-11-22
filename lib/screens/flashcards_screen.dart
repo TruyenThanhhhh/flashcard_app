@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-// SỬA: Dùng model mới
 import '../models/flashcard_set.dart';
 import '../models/flashcard.dart';
 import '../services/firestore_service.dart';
 
 class FlashcardsScreen extends StatefulWidget {
-  // SỬA: Nhận vào FlashcardSet
   final FlashcardSet set;
   const FlashcardsScreen({super.key, required this.set});
 
@@ -52,28 +50,34 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               try {
                 if (card != null && editIndex != null) {
                   await _db.updateFlashcard(
-                    widget.set.id, // SỬA
+                    widget.set.id,
                     card.id,
                     front,
                     back,
                   );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đã cập nhật thẻ!')));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Đã cập nhật thẻ!')));
+                  }
                 } else {
                   await _db.addFlashcard(
-                    widget.set.id, // SỬA
+                    widget.set.id,
                     front,
                     back,
                   );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đã thêm flashcard mới!')));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Đã thêm flashcard mới!')));
+                  }
                 }
               } catch (e) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                if (mounted) {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                }
               }
 
-              Navigator.pop(ctx);
+              if (mounted) Navigator.pop(ctx);
             },
             child: const Text('Lưu'),
           ),
@@ -94,14 +98,18 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     try {
-                      await _db.deleteFlashcard(widget.set.id, card.id); // SỬA
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Đã xoá flashcard!')));
+                      await _db.deleteFlashcard(widget.set.id, card.id);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Đã xoá flashcard!')));
+                      }
                     } catch (e) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                      if (mounted) {
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                      }
                     }
-                    Navigator.pop(ctx);
+                    if (mounted) Navigator.pop(ctx);
                   },
                   style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
@@ -116,18 +124,18 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Flashcard>>(
-      stream: _db.getFlashcardsStream(widget.set.id), // SỬA
+      stream: _db.getFlashcardsStream(widget.set.id),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            appBar: AppBar(title: Text(widget.set.title)), // SỬA
+            appBar: AppBar(title: Text(widget.set.title)),
             body: const Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasError) {
           return Scaffold(
-            appBar: AppBar(title: Text(widget.set.title)), // SỬA
+            appBar: AppBar(title: Text(widget.set.title)),
             body: Center(child: Text('Lỗi: ${snapshot.error}')),
           );
         }
@@ -136,7 +144,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
         if (flashcards.isEmpty) {
           return Scaffold(
-            appBar: AppBar(title: Text(widget.set.title)), // SỬA
+            appBar: AppBar(title: Text(widget.set.title)),
             body: const Center(child: Text('Chủ đề này chưa có flashcard nào.')),
             floatingActionButton: FloatingActionButton(
               onPressed: () => addOrEditFlashcard(),
@@ -152,7 +160,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
         final card = flashcards[currentIndex];
         
         return Scaffold(
-          appBar: AppBar(title: Text(widget.set.title)), // SỬA
+          appBar: AppBar(title: Text(widget.set.title)),
           body: Column(
             children: [
               const SizedBox(height: 12),
@@ -192,24 +200,25 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                                           subtitle: Text(fc.vietnamese),
                                           leading: Text('${idx + 1}'),
                                           trailing: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                    icon: const Icon(Icons.edit),
-                                                    onPressed: () {
-                                                      Navigator.pop(context);
-                                                      addOrEditFlashcard(
-                                                          card: fc,
-                                                          editIndex: idx);
-                                                    }),
-                                                IconButton(
-                                                    icon:
-                                                        const Icon(Icons.delete),
-                                                    onPressed: () {
-                                                      Navigator.pop(context);
-                                                      deleteFlashcard(fc);
-                                                    }),
-                                              ]),
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                  icon: const Icon(Icons.edit),
+                                                  onPressed: () {
+                                                    Navigator.pop(context);
+                                                    addOrEditFlashcard(
+                                                        card: fc,
+                                                        editIndex: idx);
+                                                  }),
+                                              IconButton(
+                                                  icon:
+                                                      const Icon(Icons.delete),
+                                                  onPressed: () {
+                                                    Navigator.pop(context);
+                                                    deleteFlashcard(fc);
+                                                  }),
+                                            ],
+                                          ),
                                         );
                                       },
                                     ),
@@ -237,13 +246,12 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                       setState(() => showMeaning = !showMeaning);
                     },
                     child: SizedBox(
-                      width: 250,
-                      height: 150,
+                      width: 280, // Tăng chiều rộng lên một chút
+                      height: 180, // Tăng chiều cao lên một chút
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 550),
                         transitionBuilder:
                             (Widget child, Animation<double> animation) {
-                          // ... (Animation lật thẻ giữ nguyên)
                           final flipAnim =
                               Tween(begin: 0.0, end: 1.0).animate(animation);
                           return AnimatedBuilder(
@@ -276,6 +284,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                             Stack(children: [if (widget != null) widget, ...list]),
                         switchInCurve: Curves.easeInOutBack,
                         switchOutCurve: Curves.easeInOutBack,
+                        
+                        // 🔥 ĐÃ SỬA PHẦN NỘI DUNG THẺ ĐỂ KHÔNG BỊ TRÀN
                         child: Container(
                           key: ValueKey(showMeaning),
                           decoration: BoxDecoration(
@@ -292,12 +302,25 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                             ],
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            showMeaning ? card.vietnamese : card.english,
-                            style: const TextStyle(
-                                fontSize: 28, fontWeight: FontWeight.bold),
-                            textDirection: TextDirection.ltr,
-                            textAlign: TextAlign.center,
+                          
+                          // Sử dụng Padding để chữ không dính lề
+                          padding: const EdgeInsets.all(16.0),
+                          
+                          child: FittedBox( // Tự động thu nhỏ nếu chữ quá to
+                            fit: BoxFit.scaleDown,
+                            child: ConstrainedBox(
+                              // Giới hạn chiều rộng để chữ tự xuống dòng
+                              constraints: const BoxConstraints(maxWidth: 250), 
+                              child: Text(
+                                showMeaning ? card.vietnamese : card.english,
+                                style: const TextStyle(
+                                    fontSize: 28, fontWeight: FontWeight.bold),
+                                textDirection: TextDirection.ltr,
+                                textAlign: TextAlign.center,
+                                maxLines: 6, // Giới hạn tối đa 6 dòng
+                                overflow: TextOverflow.ellipsis, // Thêm dấu ... nếu vẫn tràn
+                              ),
+                            ),
                           ),
                         ),
                       ),

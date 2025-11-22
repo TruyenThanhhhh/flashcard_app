@@ -1,28 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'screens/auth_wrapper.dart'; 
-import 'services/notification_service.dart'; // Import NotificationService
+import 'firebase_options.dart';
+import 'screens/auth_wrapper.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 1. Tải biến môi trường (API Key)
-  await dotenv.load(fileName: ".env"); 
 
-  // 2. Khởi tạo Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Bọc try-catch để tránh crash app ngay lúc khởi động nếu cấu hình lỗi
+  try {
+    // 1. Tải biến môi trường (Nếu không có file .env, app vẫn nên chạy tiếp)
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      debugPrint("⚠️ Warning: Không tìm thấy file .env hoặc lỗi load dotenv: $e");
+    }
 
-  // 3. Khởi tạo Notifications & Xin quyền
-  final notificationService = NotificationService();
-  await notificationService.init();
-  await notificationService.requestPermissions();
-  
-  print("✅ System Initialized!");
-  
+    // 2. Khởi tạo Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    // 3. Khởi tạo Notifications
+    final notificationService = NotificationService();
+    await notificationService.init();
+    
+    // Xin quyền thông báo (Có thể để ở màn hình Home nếu muốn App khởi động nhanh hơn)
+    // Nhưng để ở đây cũng tốt để đảm bảo quyền được cấp sớm.
+    await notificationService.requestPermissions();
+
+    debugPrint("✅ System Initialized Successfully!");
+    
+  } catch (e) {
+    debugPrint("❌ Error during initialization: $e");
+  }
+
   runApp(const FlashcardApp());
 }
 
@@ -34,7 +47,7 @@ class FlashcardApp extends StatefulWidget {
 }
 
 class _FlashcardAppState extends State<FlashcardApp> {
-  // Mặc định là chế độ sáng
+  // Mặc định là chế độ sáng (hoặc có thể lưu vào SharedPreferences để nhớ)
   ThemeMode themeMode = ThemeMode.light;
 
   void toggleTheme() {
@@ -137,7 +150,6 @@ class _FlashcardAppState extends State<FlashcardApp> {
         ),
       ),
       
-      // SỬA: Gọi AuthWrapper để xử lý luồng đăng nhập/splash
       home: AuthWrapper(
         onToggleTheme: toggleTheme,
         isDark: themeMode == ThemeMode.dark,
