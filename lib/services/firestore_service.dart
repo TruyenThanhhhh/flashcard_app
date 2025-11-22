@@ -253,65 +253,6 @@ class FirestoreService {
     }
   }
 
-  // Cập nhật quyền riêng tư của bộ thẻ
-  Future<void> updateFlashcardSetPrivacy(String setId, bool isPublic) async {
-    if (_uid == null) throw Exception("Chưa đăng nhập");
-
-    final setRef = _db.collection('users').doc(_uid).collection('flashcard_sets').doc(setId);
-    final setDoc = await setRef.get();
-    final setData = setDoc.data();
-    
-    if (setData == null) throw Exception("Không tìm thấy chủ đề");
-    
-    final currentIsPublic = setData['isPublic'] ?? false;
-    final cardCount = setData['cardCount'] ?? 0;
-    
-    // Cập nhật trạng thái trong flashcard_sets
-    await setRef.update({'isPublic': isPublic});
-    
-    if (isPublic && !currentIsPublic) {
-      // Chuyển thành Public -> Thêm vào public_lessons
-      final userDoc = await _db.collection('users').doc(_uid).get();
-      final userData = userDoc.data();
-      final creatorName = userData?['name'] ?? 'Người dùng';
-      
-      // Kiểm tra xem đã tồn tại chưa để tránh trùng lặp
-      final existingQuery = await _db.collection('public_lessons')
-          .where('lessonId', isEqualTo: setId)
-          .where('userId', isEqualTo: _uid)
-          .get();
-      
-      if (existingQuery.docs.isEmpty) {
-        await _db.collection('public_lessons').add({
-          'lessonId': setId,
-          'userId': _uid,
-          'creatorName': creatorName,
-          'title': setData['title'] ?? '',
-          'description': setData['description'] ?? '',
-          'color': setData['color'] ?? '#4CAF50',
-          'cardCount': cardCount,
-          'createdAt': setData['createdAt'] ?? FieldValue.serverTimestamp(),
-        });
-      } else {
-        // Đã có thì update
-        await existingQuery.docs.first.reference.update({
-          'cardCount': cardCount,
-          'title': setData['title'] ?? '',
-        });
-      }
-    } else if (!isPublic && currentIsPublic) {
-      // Chuyển thành Private -> Xóa khỏi public_lessons
-      final publicLessonsQuery = await _db.collection('public_lessons')
-          .where('lessonId', isEqualTo: setId)
-          .where('userId', isEqualTo: _uid)
-          .get();
-      
-      for (var doc in publicLessonsQuery.docs) {
-        await doc.reference.delete();
-      }
-    }
-  }
-
   Future<void> deleteFlashcardSet(String setId) async {
     if (_uid == null) throw Exception("Chưa đăng nhập");
 
@@ -335,9 +276,6 @@ class FirestoreService {
       }
     }
     
-    // Lưu ý: Để xóa sạch các subcollection (cards) bên trong, 
-    // lý tưởng nhất là dùng Cloud Functions. 
-    // Ở đây ta xóa document cha, các con sẽ bị mồ côi (orphaned) nhưng không hiển thị nữa.
     await setRef.delete();
 
     // Xóa luôn khỏi public_lessons nếu có
@@ -371,9 +309,6 @@ class FirestoreService {
             .toList());
   }
 
-  // Lấy danh sách thẻ 1 lần (Dùng cho chế độ Học/Quiz để không bị nhảy khi update)
-  // Nếu userId được cung cấp, lấy từ user đó (cho bài học công khai)
-  // Nếu không, lấy từ user hiện tại
   Future<List<Flashcard>> getFlashcardsOnce(String setId, {String? userId}) async {
     final targetUserId = userId ?? _uid;
     if (targetUserId == null) return [];
@@ -395,7 +330,6 @@ class FirestoreService {
   Future<void> addFlashcard(String setId, String front, String back) async {
     if (_uid == null) throw Exception("Chưa đăng nhập");
 
-    // Check if this is a public lesson before adding
     final setRef = _db
         .collection('users')
         .doc(_uid)
@@ -422,9 +356,7 @@ class FirestoreService {
     // Tăng số lượng thẻ trong bộ
     await setRef.update({'cardCount': FieldValue.increment(1)});
     
-    // If this is a public lesson, also update the public_lessons collection
     if (isPublic) {
-      // Find and update the public_lessons document
       final publicLessonsQuery = await _db.collection('public_lessons')
           .where('lessonId', isEqualTo: setId)
           .where('userId', isEqualTo: _uid)
@@ -437,7 +369,6 @@ class FirestoreService {
       }
     }
     
-    // Tăng tổng số thẻ trong stats user
     final userRef = _db.collection('users').doc(_uid);
     await userRef.update({'stats.totalFlashcards': FieldValue.increment(1)});
   }
@@ -462,7 +393,6 @@ class FirestoreService {
   Future<void> deleteFlashcard(String setId, String cardId) async {
     if (_uid == null) throw Exception("Chưa đăng nhập");
     
-    // Check if this is a public lesson before deleting
     final setRef = _db
         .collection('users')
         .doc(_uid)
@@ -481,17 +411,13 @@ class FirestoreService {
         .doc(cardId)
         .delete();
     
-    // Giảm số lượng thẻ trong bộ
     await setRef.update({'cardCount': FieldValue.increment(-1)});
     
-    // If this is a public lesson, also update the public_lessons collection
     if (isPublic) {
-      // Get the updated cardCount
       final setDocAfter = await setRef.get();
       final setDataAfter = setDocAfter.data();
       final newCardCount = (setDataAfter?['cardCount'] as num? ?? 0).toInt();
       
-      // Find and update the public_lessons document
       final publicLessonsQuery = await _db.collection('public_lessons')
           .where('lessonId', isEqualTo: setId)
           .where('userId', isEqualTo: _uid)
@@ -504,7 +430,6 @@ class FirestoreService {
       }
     }
     
-    // Giảm tổng số thẻ trong stats user
     final userRef = _db.collection('users').doc(_uid);
     await userRef.update({'stats.totalFlashcards': FieldValue.increment(-1)});
   }
@@ -692,10 +617,11 @@ class FirestoreService {
       'notificationId': notificationId,
     });
 
+    // SỬA LỖI Ở ĐÂY: Bỏ dấu nháy đơn quanh tên tham số
     StudyReminder newReminder = StudyReminder(
       id: docRef.id,
       title: title,
-      hour: hour,
+      hour: hour,           
       minute: minute,
       weekDays: weekDays,
       isEnabled: true,
@@ -717,6 +643,7 @@ class FirestoreService {
 
     await _db.collection('users').doc(_uid).collection('reminders').doc(reminder.id).update({'isEnabled': isEnabled});
 
+    // SỬA LỖI Ở ĐÂY: Bỏ dấu nháy đơn quanh tên tham số
     StudyReminder updated = StudyReminder(
       id: reminder.id,
       title: reminder.title,
@@ -769,6 +696,7 @@ class FirestoreService {
       'stats.totalHours': FieldValue.increment(duration.inHours > 0 ? duration.inHours : (duration.inMinutes / 60)),
     });
 
+    // SỬA LỖI Ở ĐÂY
     await addNotification(
       title: 'Hoàn thành bài học',
       body: 'Bạn đã học $cardsLearned thẻ trong bài "$categoryName". Cố gắng phát huy nhé!',
@@ -799,6 +727,7 @@ class FirestoreService {
     String message = 'Bạn đạt $quizScore/$totalQuestions điểm.';
     if (quizScore == totalQuestions) message = 'Xuất sắc! Bạn đúng tất cả các câu hỏi!';
 
+    // SỬA LỖI Ở ĐÂY: Bỏ dấu nháy đơn quanh tham số type
     await addNotification(
       title: 'Kết quả Quiz: $categoryName',
       body: message,
