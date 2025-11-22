@@ -516,4 +516,56 @@ class FirestoreService {
     var snapshot = await ref.get();
     return snapshot.docs;
   }
+
+  // Lấy dữ liệu học trong 7 ngày gần nhất để vẽ biểu đồ
+  Future<List<Map<String, dynamic>>> getWeeklyStudyData() async {
+    if (_uid == null) return [];
+
+    final now = DateTime.now();
+    final weekAgo = now.subtract(const Duration(days: 7));
+
+    // Lấy tất cả session trong 7 ngày qua
+    final snapshot = await _db
+        .collection('users')
+        .doc(_uid)
+        .collection('sessions')
+        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(weekAgo))
+        .get();
+
+    // Khởi tạo map cho 7 ngày (để đảm bảo ngày nào không học vẫn có data = 0)
+    Map<int, double> dailyHours = {};
+    for (int i = 0; i < 7; i++) {
+      // Key là day (1=Mon, 7=Sun) hoặc index tùy chọn
+      // Ở đây mình dùng ngày trong tháng để đơn giản hoặc weekday
+      // Để vẽ biểu đồ theo thứ: 
+      // Ta sẽ trả về list 7 phần tử, tương ứng từ [Hôm nay - 6] đến [Hôm nay]
+    }
+    
+    // Cách đơn giản hơn cho UI:
+    // Trả về List<double> hours, index 0 là 6 ngày trước, index 6 là hôm nay.
+    List<Map<String, dynamic>> result = [];
+    
+    for (int i = 6; i >= 0; i--) {
+      DateTime day = now.subtract(Duration(days: i));
+      DateTime startOfDay = DateTime(day.year, day.month, day.day);
+      DateTime endOfDay = DateTime(day.year, day.month, day.day, 23, 59, 59);
+      
+      // Lọc các session trong ngày này
+      double hours = 0;
+      for (var doc in snapshot.docs) {
+        DateTime timestamp = (doc['timestamp'] as Timestamp).toDate();
+        if (timestamp.isAfter(startOfDay) && timestamp.isBefore(endOfDay)) {
+           int durationSec = doc['duration'] ?? 0;
+           hours += durationSec / 3600.0;
+        }
+      }
+      
+      result.add({
+        'day': day, // DateTime
+        'hours': hours, // double
+      });
+    }
+    
+    return result;
+  }
 }

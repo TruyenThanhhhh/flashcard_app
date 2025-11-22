@@ -31,7 +31,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   # MỚI: Thư viện biểu đồ
   fl_chart: ^0.68.0
-  flutter_sparkline: ^2.0.0
 
 dev_dependencies:
   flutter_test:
