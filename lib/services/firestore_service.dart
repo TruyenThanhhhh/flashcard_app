@@ -59,13 +59,13 @@ class FirestoreService {
   // Lấy danh sách bài học công khai từ tất cả người dùng
   Stream<List<FlashcardSet>> getPublicLessonsStream({String? searchQuery}) {
     Query query = _db.collection('public_lessons')
-        .where('cardCount', isGreaterThan: 0) // Chỉ hiện bài có thẻ
+        .where('cardCount', isGreaterThan: 0) // Only show lessons with flashcards
         .orderBy('cardCount', descending: true);
     
     return query.snapshots().map((snapshot) {
       var lessons = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        // Tạo FlashcardSet từ dữ liệu public lesson
+        // Create a FlashcardSet from public lesson data
         return FlashcardSet(
           id: data['lessonId'] ?? doc.id,
           title: data['title'] ?? '',
@@ -73,14 +73,13 @@ class FirestoreService {
           color: data['color'] ?? '#4CAF50',
           cardCount: data['cardCount'] ?? 0,
           folder_id: 'root',
-          // Các trường bổ sung cho public
-          // isPublic: true,
-          // userId: data['userId'],
-          // creatorName: data['creatorName'],
+          isPublic: true,
+          userId: data['userId'],
+          creatorName: data['creatorName'],
         );
-      }).toList();
+      }).where((set) => set.cardCount > 0).toList(); // Additional filter to ensure no 0-card lessons
       
-      // Lọc theo từ khóa tìm kiếm (nếu có) - Client side filtering
+      // If search query provided, filter by title (case-insensitive) in memory
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final lowerQuery = searchQuery.toLowerCase();
         lessons = lessons.where((lesson) => 
@@ -92,12 +91,19 @@ class FirestoreService {
     });
   }
 
-  // Thêm bộ thẻ mới (Hợp nhất logic cũ và mới)
+  // Thêm bộ thẻ mới
   Future<void> addFlashcardSet(String title, {bool isPublic = false}) async {
     if (_uid == null) throw Exception("Chưa đăng nhập");
     
-    // Lưu vào collection riêng của user
-    DocumentReference docRef = await _db.collection('users').doc(_uid).collection('flashcard_sets').add({
+    // Get user name for public lessons
+    String? creatorName;
+    if (isPublic) {
+      final userDoc = await _db.collection('users').doc(_uid).get();
+      final userData = userDoc.data();
+      creatorName = userData?['name'] ?? 'Người dùng';
+    }
+    
+    final setData = {
       'title': title,
       'description': '',
       'color': '#4CAF50',
@@ -105,14 +111,13 @@ class FirestoreService {
       'folder_id': 'root',
       'isPublic': isPublic,
       'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    // Nếu là public, thêm vào collection chung (public_lessons)
+    };
+    
+    // Add to user's collection
+    final docRef = await _db.collection('users').doc(_uid).collection('flashcard_sets').add(setData);
+    
+    // If public, also add to public lessons collection
     if (isPublic) {
-      final userDoc = await _db.collection('users').doc(_uid).get();
-      final userData = userDoc.data();
-      final creatorName = userData?['name'] ?? 'Người dùng';
-
       await _db.collection('public_lessons').add({
         'lessonId': docRef.id,
         'userId': _uid,
@@ -124,7 +129,8 @@ class FirestoreService {
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
-
+    
+    // Tự động tạo thông báo hệ thống
     await addNotification(
       title: 'Chủ đề mới',
       body: 'Bạn vừa tạo chủ đề "$title". Hãy thêm thẻ để bắt đầu học nhé!',
@@ -143,7 +149,7 @@ class FirestoreService {
         .doc(setId)
         .update({'title': newTitle});
     
-    // Kiểm tra nếu là public lesson thì cập nhật cả bên public_lessons
+    // If this is a public lesson, also update the title in public_lessons
     final setDoc = await _db.collection('users').doc(_uid).collection('flashcard_sets').doc(setId).get();
     final setData = setDoc.data();
     if (setData != null && setData['isPublic'] == true) {
@@ -154,6 +160,95 @@ class FirestoreService {
       
       if (publicLessonsQuery.docs.isNotEmpty) {
         await publicLessonsQuery.docs.first.reference.update({'title': newTitle});
+      }
+    }
+  }
+
+  // Cập nhật quyền riêng tư của bộ thẻ
+  Future<void> updateFlashcardSetPrivacy(String setId, bool isPublic) async {
+    if (_uid == null) throw Exception("Chưa đăng nhập");
+
+    final setRef = _db.collection('users').doc(_uid).collection('flashcard_sets').doc(setId);
+    final setDoc = await setRef.get();
+    final setData = setDoc.data();
+    
+    if (setData == null) throw Exception("Không tìm thấy chủ đề");
+    
+    final currentIsPublic = setData['isPublic'] ?? false;
+    final cardCount = setData['cardCount'] ?? 0;
+    
+    // Update the isPublic field
+    await setRef.update({'isPublic': isPublic});
+    
+    if (isPublic && !currentIsPublic) {
+      // Making it public - add to public_lessons
+      final userDoc = await _db.collection('users').doc(_uid).get();
+      final userData = userDoc.data();
+      final creatorName = userData?['name'] ?? 'Người dùng';
+      
+      // Check if entry already exists (shouldn't happen, but just in case)
+      final existingQuery = await _db.collection('public_lessons')
+          .where('lessonId', isEqualTo: setId)
+          .where('userId', isEqualTo: _uid)
+          .get();
+      
+      if (existingQuery.docs.isEmpty) {
+        await _db.collection('public_lessons').add({
+          'lessonId': setId,
+          'userId': _uid,
+          'creatorName': creatorName,
+          'title': setData['title'] ?? '',
+          'description': setData['description'] ?? '',
+          'color': setData['color'] ?? '#4CAF50',
+          'cardCount': cardCount,
+          'createdAt': setData['createdAt'] ?? FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Update existing entry with current cardCount
+        await existingQuery.docs.first.reference.update({
+          'cardCount': cardCount,
+          'title': setData['title'] ?? '',
+        });
+      }
+    } else if (!isPublic && currentIsPublic) {
+      // Making it private - remove from public_lessons
+      final publicLessonsQuery = await _db.collection('public_lessons')
+          .where('lessonId', isEqualTo: setId)
+          .where('userId', isEqualTo: _uid)
+          .get();
+      
+      for (var doc in publicLessonsQuery.docs) {
+        await doc.reference.delete();
+      }
+    } else if (isPublic && currentIsPublic) {
+      // Already public - ensure public_lessons entry exists and is synced
+      final publicLessonsQuery = await _db.collection('public_lessons')
+          .where('lessonId', isEqualTo: setId)
+          .where('userId', isEqualTo: _uid)
+          .get();
+      
+      if (publicLessonsQuery.docs.isEmpty) {
+        // Entry missing - create it
+        final userDoc = await _db.collection('users').doc(_uid).get();
+        final userData = userDoc.data();
+        final creatorName = userData?['name'] ?? 'Người dùng';
+        
+        await _db.collection('public_lessons').add({
+          'lessonId': setId,
+          'userId': _uid,
+          'creatorName': creatorName,
+          'title': setData['title'] ?? '',
+          'description': setData['description'] ?? '',
+          'color': setData['color'] ?? '#4CAF50',
+          'cardCount': cardCount,
+          'createdAt': setData['createdAt'] ?? FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Entry exists - sync cardCount
+        await publicLessonsQuery.docs.first.reference.update({
+          'cardCount': cardCount,
+          'title': setData['title'] ?? '',
+        });
       }
     }
   }
@@ -226,7 +321,23 @@ class FirestoreService {
         .collection('flashcard_sets')
         .doc(setId);
     
-    // Xóa bộ thẻ
+    // Check if this is a public lesson and remove from public_lessons
+    final setDoc = await setRef.get();
+    final setData = setDoc.data();
+    if (setData != null && setData['isPublic'] == true) {
+      final publicLessonsQuery = await _db.collection('public_lessons')
+          .where('lessonId', isEqualTo: setId)
+          .where('userId', isEqualTo: _uid)
+          .get();
+      
+      for (var doc in publicLessonsQuery.docs) {
+        await doc.reference.delete();
+      }
+    }
+    
+    // Lưu ý: Để xóa sạch các subcollection (cards) bên trong, 
+    // lý tưởng nhất là dùng Cloud Functions. 
+    // Ở đây ta xóa document cha, các con sẽ bị mồ côi (orphaned) nhưng không hiển thị nữa.
     await setRef.delete();
 
     // Xóa luôn khỏi public_lessons nếu có
@@ -260,7 +371,9 @@ class FirestoreService {
             .toList());
   }
 
-  // Lấy danh sách thẻ 1 lần (Hợp nhất: hỗ trợ cả userId khác cho Public Lesson)
+  // Lấy danh sách thẻ 1 lần (Dùng cho chế độ Học/Quiz để không bị nhảy khi update)
+  // Nếu userId được cung cấp, lấy từ user đó (cho bài học công khai)
+  // Nếu không, lấy từ user hiện tại
   Future<List<Flashcard>> getFlashcardsOnce(String setId, {String? userId}) async {
     final targetUserId = userId ?? _uid;
     if (targetUserId == null) return [];
@@ -282,25 +395,36 @@ class FirestoreService {
   Future<void> addFlashcard(String setId, String front, String back) async {
     if (_uid == null) throw Exception("Chưa đăng nhập");
 
-    // Kiểm tra xem bộ thẻ có public không để cập nhật count bên ngoài
-    final setRef = _db.collection('users').doc(_uid).collection('flashcard_sets').doc(setId);
+    // Check if this is a public lesson before adding
+    final setRef = _db
+        .collection('users')
+        .doc(_uid)
+        .collection('flashcard_sets')
+        .doc(setId);
     final setDoc = await setRef.get();
     final setData = setDoc.data();
     final isPublic = setData != null && setData['isPublic'] == true;
 
-    // Thêm thẻ vào sub-collection 'cards'
-    await setRef.collection('cards').add({
+    final cardCollection = _db
+        .collection('users')
+        .doc(_uid)
+        .collection('flashcard_sets')
+        .doc(setId)
+        .collection('cards');
+    
+    await cardCollection.add({
       'front': front,
       'back': back,
       'created_at': FieldValue.serverTimestamp(),
       'note': '',
     });
 
-    // Tăng số lượng thẻ trong bộ (Chỉ gọi 1 lần)
+    // Tăng số lượng thẻ trong bộ
     await setRef.update({'cardCount': FieldValue.increment(1)});
     
-    // Nếu public, cập nhật count trong public_lessons
+    // If this is a public lesson, also update the public_lessons collection
     if (isPublic) {
+      // Find and update the public_lessons document
       final publicLessonsQuery = await _db.collection('public_lessons')
           .where('lessonId', isEqualTo: setId)
           .where('userId', isEqualTo: _uid)
@@ -337,22 +461,37 @@ class FirestoreService {
 
   Future<void> deleteFlashcard(String setId, String cardId) async {
     if (_uid == null) throw Exception("Chưa đăng nhập");
-
-    final setRef = _db.collection('users').doc(_uid).collection('flashcard_sets').doc(setId);
-    final setDoc = await setRef.get();
-    final setData = setDoc.data();
-    final isPublic = setData != null && setData['isPublic'] == true;
-
-    // Xóa thẻ
-    await setRef.collection('cards').doc(cardId).delete();
-
-    // Giảm số lượng thẻ trong bộ (Chỉ gọi 1 lần)
+    
+    // Check if this is a public lesson before deleting
+    final setRef = _db
+        .collection('users')
+        .doc(_uid)
+        .collection('flashcard_sets')
+        .doc(setId);
+    final setDocBefore = await setRef.get();
+    final setDataBefore = setDocBefore.data();
+    final isPublic = setDataBefore != null && setDataBefore['isPublic'] == true;
+    
+    await _db
+        .collection('users')
+        .doc(_uid)
+        .collection('flashcard_sets')
+        .doc(setId)
+        .collection('cards')
+        .doc(cardId)
+        .delete();
+    
+    // Giảm số lượng thẻ trong bộ
     await setRef.update({'cardCount': FieldValue.increment(-1)});
     
-    // Nếu public, cập nhật count trong public_lessons
+    // If this is a public lesson, also update the public_lessons collection
     if (isPublic) {
-      // Lấy lại cardCount chính xác sau khi giảm (hoặc dùng increment -1)
-      // Dùng increment cho an toàn
+      // Get the updated cardCount
+      final setDocAfter = await setRef.get();
+      final setDataAfter = setDocAfter.data();
+      final newCardCount = (setDataAfter?['cardCount'] as num? ?? 0).toInt();
+      
+      // Find and update the public_lessons document
       final publicLessonsQuery = await _db.collection('public_lessons')
           .where('lessonId', isEqualTo: setId)
           .where('userId', isEqualTo: _uid)
@@ -360,7 +499,7 @@ class FirestoreService {
       
       if (publicLessonsQuery.docs.isNotEmpty) {
         await publicLessonsQuery.docs.first.reference.update({
-          'cardCount': FieldValue.increment(-1),
+          'cardCount': newCardCount,
         });
       }
     }

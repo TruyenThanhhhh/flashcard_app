@@ -32,7 +32,18 @@ class _QuizScreenState extends State<QuizScreen> {
   void initState() {
     super.initState();
     _sessionStartTime = DateTime.now();
-    _cardsFuture = _db.getFlashcardsOnce(widget.set.id);
+    
+    // MỚI: Bắt đầu tải thẻ ngay lập tức
+    // Nếu là bài học công khai, truyền userId để lấy từ user khác
+    _cardsFuture = _db.getFlashcardsOnce(
+      widget.set.id,
+      userId: widget.set.isPublic ? widget.set.userId : null,
+    );
+    
+    // BỎ: Toàn bộ logic chuẩn bị quiz sẽ được dời đi
+    // cards = [...widget.category.cards];
+    // questionOrder = ...
+    // options = ...
   }
   
   void _initializeQuiz(List<Flashcard> loadedCards) {
