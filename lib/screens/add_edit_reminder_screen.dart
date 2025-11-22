@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../models/study_reminder.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 
 class AddEditReminderScreen extends StatefulWidget {
   final StudyReminder? reminder;
@@ -15,16 +16,22 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
   final _titleController = TextEditingController(text: "Đến giờ học rồi! 📚");
   late Duration _selectedTime;
   List<int> _selectedDays = [1, 2, 3, 4, 5, 6, 7];
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+    // Xin quyền ngay khi vào màn hình để đảm bảo trải nghiệm mượt mà
+    NotificationService().requestPermissions();
+
     if (widget.reminder != null) {
       _titleController.text = widget.reminder!.title;
       _selectedTime = Duration(hours: widget.reminder!.hour, minutes: widget.reminder!.minute);
       _selectedDays = List.from(widget.reminder!.weekDays);
     } else {
-      _selectedTime = const Duration(hours: 20, minutes: 0);
+      // Mặc định lấy giờ hiện tại
+      final now = DateTime.now();
+      _selectedTime = Duration(hours: now.hour, minutes: now.minute);
     }
   }
 
@@ -40,26 +47,37 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
   }
 
   Future<void> _save() async {
-    final db = FirestoreService();
-    final hour = _selectedTime.inHours;
-    final minute = _selectedTime.inMinutes % 60;
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
 
-    if (widget.reminder == null) {
-      await db.addReminder(_titleController.text, hour, minute, _selectedDays);
-    } else {
-      final updatedReminder = StudyReminder(
-        id: widget.reminder!.id,
-        title: _titleController.text,
-        hour: hour,
-        minute: minute,
-        weekDays: _selectedDays,
-        isEnabled: true, // Sửa xong tự động bật lại
-        notificationId: widget.reminder!.notificationId,
-      );
-      await db.updateReminder(updatedReminder);
+    try {
+      final db = FirestoreService();
+      final hour = _selectedTime.inHours;
+      final minute = _selectedTime.inMinutes % 60;
+
+      if (widget.reminder == null) {
+        await db.addReminder(_titleController.text, hour, minute, _selectedDays);
+      } else {
+        final updatedReminder = StudyReminder(
+          id: widget.reminder!.id,
+          title: _titleController.text,
+          hour: hour,
+          minute: minute,
+          weekDays: _selectedDays,
+          isEnabled: true,
+          notificationId: widget.reminder!.notificationId,
+        );
+        await db.updateReminder(updatedReminder);
+      }
+
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-
-    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -74,18 +92,22 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(widget.reminder == null ? 'Thêm nhắc nhở' : 'Sửa nhắc nhở', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+        title: Text(widget.reminder == null ? 'Thêm nhắc nhở' : 'Sửa nhắc nhở', 
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
-        actions: [TextButton(onPressed: _save, child: const Text('Lưu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)))],
+        actions: [
+          _isSaving 
+            ? const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator.adaptive())
+            : TextButton(onPressed: _save, child: const Text('Lưu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)))
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-             // Tên
             TextField(
               controller: _titleController,
               decoration: InputDecoration(
@@ -98,7 +120,6 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Giờ
             Container(
               height: 200,
               decoration: BoxDecoration(
@@ -116,7 +137,6 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Ngày
             const Text("Lặp lại", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 12),
             Wrap(

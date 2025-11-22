@@ -295,14 +295,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
               ),
               const SizedBox(width: 12),
-              Text(
-                userName,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              
+              // 🔥 FIX LỖI TRÀN TÊN: Dùng Expanded + TextOverflow
+              Expanded(
+                child: Text(
+                  userName,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1, // Chỉ hiện 1 dòng
+                  overflow: TextOverflow.ellipsis, // Hiện ... nếu quá dài
                 ),
               ),
-              const Spacer(),
+              
               IconButton(
                 icon: Icon(
                   widget.isDark ? Icons.dark_mode : Icons.light_mode,
