@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// SỬA: ĐÃ XÓA CÁC DÒNG IMPORT LỖI (import home_screen, login_screen)
+// ĐÂY LÀ NỘI DUNG ĐÚNG CỦA FILE NÀY
+// (Nó định nghĩa "FlashcardSet" là gì)
 
 class FlashcardSet {
   final String id;

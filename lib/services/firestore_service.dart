@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/flashcard_set.dart';
 import '../models/flashcard.dart';
+import '../models/note.dart'; // MỚI: Import model Note
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -65,7 +66,8 @@ class FirestoreService {
         .collection('flashcard_sets')
         .doc(setId);
     
-    // TODO: Cần Cloud Function để xóa subcollection 'cards'
+    // Lưu ý: Subcollection 'cards' vẫn còn trong DB (orphan)
+    // Cần Cloud Function để xóa triệt để.
     await setRef.delete();
   }
 
@@ -86,7 +88,6 @@ class FirestoreService {
             .toList());
   }
 
-  // MỚI: Hàm lấy thẻ 1 LẦN (dùng cho Learning/Quiz)
   Future<List<Flashcard>> getFlashcardsOnce(String setId) async {
     if (_uid == null) return [];
 
@@ -166,9 +167,9 @@ class FirestoreService {
     await setRef.update({'cardCount': FieldValue.increment(-1)});
   }
 
-  // --- Learning Session ---
+  // === SESSIONS ===
   Future<void> recordLearningSession({
-    required String categoryId, // SỬA: Dùng tên nhất quán
+    required String categoryId,
     required String categoryName,
     required Duration duration,
     required int cardsLearned,
@@ -184,10 +185,16 @@ class FirestoreService {
       'cardsLearned': cardsLearned,
       'timestamp': Timestamp.now(),
     });
+    
+    // Cập nhật tổng giờ học
+    final userRef = _db.collection('users').doc(_uid);
+    await userRef.update({
+      'stats.totalHours': FieldValue.increment(duration.inHours > 0 ? duration.inHours : (duration.inMinutes / 60)),
+    });
   }
 
   Future<void> recordQuizSession({
-    required String categoryId, // SỬA: Dùng tên nhất quán
+    required String categoryId,
     required String categoryName,
     required Duration duration,
     required int quizScore,
@@ -207,7 +214,7 @@ class FirestoreService {
     });
   }
 
-  // --- Statistics ---
+  // === STATISTICS ===
   Future<List<QueryDocumentSnapshot>> getRecentSessions(int limit) async {
     if (_uid == null) throw Exception("Chưa đăng nhập");
     
@@ -217,5 +224,67 @@ class FirestoreService {
             
     var snapshot = await ref.get();
     return snapshot.docs;
+  }
+
+  // ==================================================
+  // === MỚI: PHẦN XỬ LÝ GHI CHÚ (NOTES) ===
+  // ==================================================
+
+  Stream<List<Note>> getNotesStream() {
+    if (_uid == null) return Stream.value([]);
+
+    return _db
+        .collection('users')
+        .doc(_uid)
+        .collection('notes')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Note.fromFirestore(doc))
+            .toList());
+  }
+
+  Future<void> addNote(String title, String content) async {
+    if (_uid == null) throw Exception("Chưa đăng nhập");
+
+    await _db.collection('users').doc(_uid).collection('notes').add({
+      'title': title,
+      'content': content,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // Cập nhật thống kê số lượng ghi chú
+    final userRef = _db.collection('users').doc(_uid);
+    await userRef.update({'stats.totalNotes': FieldValue.increment(1)});
+  }
+
+  Future<void> updateNote(String noteId, String title, String content) async {
+    if (_uid == null) throw Exception("Chưa đăng nhập");
+
+    await _db
+        .collection('users')
+        .doc(_uid)
+        .collection('notes')
+        .doc(noteId)
+        .update({
+      'title': title,
+      'content': content,
+      // 'updatedAt': FieldValue.serverTimestamp(), // Có thể thêm nếu muốn
+    });
+  }
+
+  Future<void> deleteNote(String noteId) async {
+    if (_uid == null) throw Exception("Chưa đăng nhập");
+
+    await _db
+        .collection('users')
+        .doc(_uid)
+        .collection('notes')
+        .doc(noteId)
+        .delete();
+
+    // Giảm thống kê số lượng ghi chú
+    final userRef = _db.collection('users').doc(_uid);
+    await userRef.update({'stats.totalNotes': FieldValue.increment(-1)});
   }
 }

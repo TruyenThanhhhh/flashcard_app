@@ -1,9 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-// SỬA: Dùng model mới
 import '../models/flashcard_set.dart';
-
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import 'flashcards_screen.dart';
@@ -12,6 +10,8 @@ import 'quiz_mode_selection_screen.dart';
 import 'ai_assistant_screen.dart';
 import 'settings_screen.dart';
 import 'help_screen.dart';
+import 'notes_list_screen.dart';
+import 'note_editor_screen.dart'; // MỚI: Import để mở màn hình tạo ghi chú
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -24,29 +24,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int selectedTab = 0;
   
-  // SỬA: Khởi tạo các service
   final FirestoreService _db = FirestoreService();
   final AuthService _auth = AuthService();
-  
-  // SỬA: Xóa các biến state và hàm initState, _loadUserData, _loadCategories
-  // Chúng ta sẽ dùng StreamBuilder
 
   @override
   Widget build(BuildContext context) {
-    // SỬA: Lấy isDark từ widget, không phải context
     final isDark = widget.isDark;
     
-    // SỬA: Lấy stream của user doc để build AppBar/Drawer
     return StreamBuilder<DocumentSnapshot>(
-      stream: _db.getUserStream(), // Hàm mới trong service
+      stream: _db.getUserStream(),
       builder: (context, userSnapshot) {
         
-        // Lấy dữ liệu user (hoặc dùng mặc định nếu đang tải)
         String userName = "Đang tải...";
         String? userPhotoURL;
         String userEmail = "";
         int studyStreak = 0;
-        double totalHours = 0.0; // SỬA: totalHours là double
+        double totalHours = 0.0; 
 
         if (userSnapshot.connectionState == ConnectionState.active && userSnapshot.hasData) {
           final data = userSnapshot.data!.data() as Map<String, dynamic>? ?? {};
@@ -59,8 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         return Scaffold(
-          backgroundColor: isDark ? Color(0xFF0F172A) : Colors.grey[100],
-          // SỬA: Truyền dữ liệu user động vào drawer
+          backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.grey[100],
           drawer: _buildDrawer(context, isDark, userName, userEmail, userPhotoURL),
           appBar: AppBar(
             backgroundColor: Colors.transparent,
@@ -79,11 +71,13 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             centerTitle: true,
-            title: Image.asset(
-              'assets/images/StudyMateRemoveBG.png', // SỬA: Đường dẫn asset
-              height: 32,
-              fit: BoxFit.contain,
-            ),
+            title: selectedTab == 1 
+                ? Text('Ghi chú', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold))
+                : Image.asset(
+                    'assets/images/StudyMateRemoveBG.png',
+                    height: 32,
+                    fit: BoxFit.contain,
+                  ),
             actions: [
               IconButton(
                 icon: Icon(
@@ -92,13 +86,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 onPressed: () {},
               ),
-              IconButton(
-                icon: Icon(
-                  Icons.notifications_outlined,
-                  color: isDark ? Colors.white : Colors.black87,
+              if (selectedTab == 0)
+                IconButton(
+                  icon: Icon(
+                    Icons.notifications_outlined,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  onPressed: () {},
                 ),
-                onPressed: () {},
-              ),
             ],
           ),
           bottomNavigationBar: BottomNavigationBar(
@@ -107,18 +102,98 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() => selectedTab = i);
             },
             type: BottomNavigationBarType.fixed,
+            selectedItemColor: Colors.indigo,
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.bar_chart),
-                label: 'Thống kê',
-              ),
+              BottomNavigationBarItem(icon: Icon(Icons.note_alt), label: 'Ghi chú'),
+              BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Thống kê'),
             ],
           ),
-          // SỬA: Truyền dữ liệu user động vào các tab
-          body: selectedTab == 0
-              ? _buildHomeContent(context, userName, userPhotoURL, studyStreak, totalHours.toInt())
-              : _buildStatistics(context, userSnapshot),
+          body: _buildBody(selectedTab, context, userName, userPhotoURL, studyStreak, totalHours.toInt(), userSnapshot),
+          // MỚI: Thêm nút FAB chung cho màn hình Home để tạo nhanh
+          floatingActionButton: selectedTab == 0 
+            ? FloatingActionButton(
+                onPressed: () => _showAddOptions(context),
+                child: const Icon(Icons.add),
+              )
+            : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(int tabIndex, BuildContext context, String userName, String? userPhotoURL, int studyStreak, int totalHours, AsyncSnapshot<DocumentSnapshot> userSnapshot) {
+    switch (tabIndex) {
+      case 0:
+        return _buildHomeContent(context, userName, userPhotoURL, studyStreak, totalHours);
+      case 1:
+        return const NotesListScreen();
+      case 2:
+        return _buildStatistics(context, userSnapshot);
+      default:
+        return const SizedBox();
+    }
+  }
+
+  // MỚI: Hàm hiển thị lựa chọn Thêm
+  void _showAddOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    'Bạn muốn tạo gì?',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.style, color: Colors.indigo),
+                  ),
+                  title: const Text('Bộ thẻ mới (Flashcard)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Tạo chủ đề để học từ vựng'),
+                  onTap: () {
+                    Navigator.pop(ctx); // Đóng menu
+                    _showAddSetDialog(context); // Mở dialog tạo chủ đề
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.note_alt, color: Colors.orange),
+                  ),
+                  title: const Text('Ghi chú mới (Note)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Viết ghi chú nhanh'),
+                  onTap: () {
+                    Navigator.pop(ctx); // Đóng menu
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const NoteEditorScreen()),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -129,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
     String userName,
     String? userPhotoURL,
     int studyStreak,
-    int totalHours, // Nhận int cho dễ hiển thị
+    int totalHours,
   ) {
     final userInitial = (userName.isNotEmpty) ? userName[0].toUpperCase() : '?';
 
@@ -177,7 +252,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 20),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -197,10 +271,9 @@ class _HomeScreenState extends State<HomeScreen> {
           
           _buildSectionHeader(
             'Thư mục của tôi',
-            onPressed: () => _showAddSetDialog(context),
+            // SỬA: Gọi _showAddOptions thay vì _showAddSetDialog trực tiếp
+            onPressed: () => _showAddOptions(context),
           ),
-
-          // SỬA: Dùng StreamBuilder để tải danh sách bộ thẻ
           StreamBuilder<List<FlashcardSet>>(
             stream: _db.getFlashcardSetsStream(),
             builder: (context, snapshot) {
@@ -212,7 +285,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               }
-
               if (snapshot.hasError) {
                 return Center(
                   child: Padding(
@@ -242,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Nhấn "Thêm" để tạo chủ đề mới',
+                          'Nhấn nút "+" để tạo mới',
                           style: TextStyle(color: Colors.grey),
                         ),
                       ],
@@ -251,12 +323,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }
 
-              // Hiển thị danh sách chủ đề
               return Column(
                 children: sets.map<Widget>((set) => _buildCourseCard(
                   set,
                   '${set.cardCount} thuật ngữ',
-                  // SỬA: Dùng tryParse an toàn hơn
                   Color(int.tryParse(set.color.replaceFirst('#', '0xFF')) ?? 0xFF4CAF50),
                 )).toList(),
               );
@@ -268,13 +338,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Hàm thêm chủ đề (FlashcardSet)
   void _showAddSetDialog(BuildContext context) {
     final nameController = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Thêm chủ đề mới'),
+        title: const Text('Thêm chủ đề mới'),
         content: TextField(
           controller: nameController,
           decoration: const InputDecoration(labelText: 'Tên chủ đề'),
@@ -344,7 +413,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Dùng model FlashcardSet
   Widget _buildCourseCard(FlashcardSet set, String subtitle, Color color) {
     return InkWell(
       onTap: () => _showCategoryOptions(context, set),
@@ -389,7 +457,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Dùng model FlashcardSet
   void _showCategoryOptions(BuildContext context, FlashcardSet set) {
     showModalBottomSheet(
       context: context,
@@ -429,7 +496,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 24),
                 
-                // SỬA: Truyền đúng tham số (set: set)
                 _buildOptionTile(
                   ctx,
                   icon: Icons.style,
@@ -442,7 +508,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) =>
-                            FlashcardsScreen(set: set), // SỬA
+                            FlashcardsScreen(set: set), 
                       ),
                     );
                   },
@@ -460,7 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) =>
-                            LearningScreen(set: set), // SỬA
+                            LearningScreen(set: set), 
                       ),
                     );
                   },
@@ -477,7 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => QuizModeSelectionScreen(set: set), // SỬA
+                        builder: (context) => QuizModeSelectionScreen(set: set), 
                       ),
                     );
                   },
@@ -515,13 +581,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
-  // SỬA: Hàm sửa chủ đề (FlashcardSet)
   void _showEditSetDialog(BuildContext context, FlashcardSet set) {
     final nameController = TextEditingController(text: set.title);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Sửa tên chủ đề'),
+        title: const Text('Sửa tên chủ đề'),
         content: TextField(
           controller: nameController,
           decoration: const InputDecoration(labelText: 'Tên chủ đề'),
@@ -549,12 +614,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Hàm xóa chủ đề (FlashcardSet)
   void _showDeleteSetDialog(BuildContext context, FlashcardSet set) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Xác nhận xóa'),
+        title: const Text('Xác nhận xóa'),
         content: Text(
             'Bạn có chắc chắn muốn xóa chủ đề "${set.title}" không? Toàn bộ flashcard bên trong cũng sẽ bị xóa vĩnh viễn.'),
         actions: [
@@ -633,7 +697,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Tab Thống kê dùng userSnapshot
   Widget _buildStatistics(BuildContext context, AsyncSnapshot<DocumentSnapshot> userSnapshot) {
      if (userSnapshot.connectionState == ConnectionState.waiting) {
         return const Center(child: CircularProgressIndicator());
@@ -789,7 +852,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
-
+  
   // SỬA: Hàm Drawer
   Widget _buildDrawer(
     BuildContext context,
@@ -858,6 +921,14 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.note_alt, color: Colors.indigo), // MỚI
+            title: const Text('Ghi chú'),
+            onTap: () {
+              Navigator.pop(context);
+              setState(() { selectedTab = 1; }); // Chuyển sang tab ghi chú
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.auto_awesome, color: Colors.indigo),
             title: const Text('AI Assistant'),
             onTap: () {
@@ -875,7 +946,7 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text('Thống kê'),
             onTap: () {
               Navigator.pop(context);
-              setState(() { selectedTab = 1; });
+              setState(() { selectedTab = 2; }); // Cập nhật index thành 2
             },
           ),
           const Divider(),
@@ -936,7 +1007,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
-  // SỬA: Hàm dialog Đăng xuất
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -952,7 +1022,6 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               await _auth.signOut();
-              // StreamBuilder sẽ tự động điều hướng
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Đăng xuất'),

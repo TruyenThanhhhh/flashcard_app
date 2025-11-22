@@ -1,50 +1,42 @@
 name: flashcard_app
 description: "A flashcard learning app using Firebase Firestore and Authentication."
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
-  # SỬA: Đặt về phiên bản Dart SDK ổn định
   sdk: '>=3.4.0 <4.0.0'
 
 dependencies:
+  intl: ^0.19.0
+
   flutter:
     sdk: flutter
 
-  # --- Firebase (SỬA: Đã cập nhật lên phiên bản mới nhất) ---
-  # Lưu ý: Phiên bản Firebase core đã giảm từ 4.x -> 3.x
+  # Firebase
   firebase_core: ^3.1.1
-  # Lưu ý: Phiên bản Firebase auth đã giảm từ 6.x -> 5.x
   firebase_auth: ^5.1.1
-  # Lưu ý: Phiên bản Firebase store đã giảm từ 6.x -> 5.x
   cloud_firestore: ^5.0.2
 
-  # --- Services ---
-  # SỬA: Đã xóa các mục bị trùng lặp
+  # Services
   google_sign_in: ^6.2.1
-  http: ^1.2.1 # Cập nhật bản vá nhỏ
-
-  # --- Tiện ích ---
+  http: ^1.2.1
+  
+  # Tiện ích
   flutter_dotenv: ^5.1.1
 
-  # --- Giao diện ---
+  # Giao diện
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   
-  # MỚI: Thêm Linter để giúp code sạch và chuẩn hơn
   flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
 
   # SỬA: Đã sửa lỗi thụt lề
-  # SỬA: Khai báo cả thư mục để dễ dàng thêm ảnh sau này
-  # Hãy đảm bảo bạn tạo thư mục "assets/images/"
   assets:
-
     - .env
     - assets/images/

@@ -16,9 +16,6 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
 
-  // SỬA: ĐÃ XÓA API KEY KHỎI CODE
-  // final String _apiKey = '...';
-
   @override
   void initState() {
     super.initState();
