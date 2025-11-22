@@ -151,7 +151,6 @@ class QuizModeSelectionScreen extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
-    // ... (Toàn bộ UI của hàm này giữ nguyên, không cần sửa) ...
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),

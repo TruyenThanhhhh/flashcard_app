@@ -1,21 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Giữ lại
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/splash_screen.dart'; // Chỉ cần import file này
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/auth_wrapper.dart'; 
+import 'services/notification_service.dart'; // Import NotificationService
 
-// Hàm main đã được cập nhật
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Giữ lại .env nếu bạn cần
+  // 1. Tải biến môi trường (API Key)
   await dotenv.load(fileName: ".env"); 
 
+  // 2. Khởi tạo Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 3. Khởi tạo Notifications & Xin quyền
+  final notificationService = NotificationService();
+  await notificationService.init();
+  await notificationService.requestPermissions();
   
-  print("✅ Firebase Initialized!");
+  print("✅ System Initialized!");
   
   runApp(const FlashcardApp());
 }
@@ -28,19 +34,13 @@ class FlashcardApp extends StatefulWidget {
 }
 
 class _FlashcardAppState extends State<FlashcardApp> {
-  // Logic theme giữ nguyên
-  ThemeMode themeMode = ThemeMode.system; // SỬA: Dùng 'system' làm mặc định
+  // Mặc định là chế độ sáng
+  ThemeMode themeMode = ThemeMode.light;
 
   void toggleTheme() {
     setState(() {
-      if (themeMode == ThemeMode.system) {
-        // Lấy theme hiện tại của hệ thống để quyết định
-        final brightness = MediaQuery.of(context).platformBrightness;
-        themeMode = brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark;
-      } else {
-        themeMode =
-            themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-      }
+      themeMode =
+          themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
     });
   }
 
@@ -51,42 +51,42 @@ class _FlashcardAppState extends State<FlashcardApp> {
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
 
-      // --- Theme và DarkTheme của bạn giữ nguyên ---
+      // --- LIGHT THEME ---
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.indigo,
           brightness: Brightness.light,
         ),
         brightness: Brightness.light,
-        scaffoldBackgroundColor: Color(0xFFF8FAFC), // Sửa: Dùng màu nhạt
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         visualDensity: VisualDensity.adaptivePlatformDensity,
-        cardTheme: const CardThemeData(
-          color: Colors.white, // Sửa: Dùng màu trắng
-          margin: EdgeInsets.all(10),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          margin: const EdgeInsets.all(10),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(18)),
+            borderRadius: BorderRadius.circular(18),
           ),
-          elevation: 2, // Sửa: Giảm elevation
+          elevation: 2,
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white, // Sửa
+          backgroundColor: Colors.white,
           elevation: 1,
           scrolledUnderElevation: 1,
           iconTheme: IconThemeData(color: Colors.black87),
           titleTextStyle: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
-            color: Colors.black87, // Sửa
+            color: Colors.black87,
           ),
         ),
         textTheme: const TextTheme(
           titleLarge: TextStyle(fontWeight: FontWeight.bold),
         ),
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
           backgroundColor: Colors.indigo,
-          foregroundColor: Colors.white, // MỚI: Thêm màu icon
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         snackBarTheme: const SnackBarThemeData(
@@ -97,22 +97,24 @@ class _FlashcardAppState extends State<FlashcardApp> {
           ),
         ),
       ),
+
+      // --- DARK THEME ---
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.indigo,
           brightness: Brightness.dark,
         ),
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Color(0xFF0F172A), // Sửa: Dùng màu nền tối
-        cardTheme: const CardThemeData(
-          color: Color(0xFF1E293B), // Sửa
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        cardTheme: CardThemeData(
+          color: const Color(0xFF1E293B),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(18)),
+            borderRadius: BorderRadius.circular(18),
           ),
           elevation: 1,
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1E293B), // Sửa
+          backgroundColor: Color(0xFF1E293B),
           elevation: 1,
           scrolledUnderElevation: 1,
           iconTheme: IconThemeData(color: Colors.white),
@@ -126,23 +128,19 @@ class _FlashcardAppState extends State<FlashcardApp> {
           titleLarge:
               TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
           backgroundColor: Colors.indigo,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),
-      // --- HẾT PHẦN THEME ---
-
-      // SỬA: Đã xóa FutureBuilder và AuthWrapper
-      // home: sẽ gọi thẳng SplashScreen và truyền logic theme vào
-      home: SplashScreen(
+      
+      // SỬA: Gọi AuthWrapper để xử lý luồng đăng nhập/splash
+      home: AuthWrapper(
         onToggleTheme: toggleTheme,
-        isDark: themeMode == ThemeMode.dark ||
-                (themeMode == ThemeMode.system &&
-                    MediaQuery.of(context).platformBrightness == Brightness.dark),
+        isDark: themeMode == ThemeMode.dark,
       ),
     );
   }

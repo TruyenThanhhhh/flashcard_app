@@ -1,21 +1,19 @@
-// lib/screens/home_screen.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
-// SỬA: Dùng model mới
-import '../models/flashcard_set.dart'; 
-// import '../models/category.dart'; // BỎ
-
+import '../models/flashcard_set.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import 'flashcards_screen.dart';
 import 'learning_screen.dart';
 import 'quiz_mode_selection_screen.dart';
 import 'ai_assistant_screen.dart';
-import 'settings_screen.dart'; // Thêm import
-import 'help_screen.dart'; // Thêm import
+import 'settings_screen.dart';
+import 'help_screen.dart';
+import 'notes_list_screen.dart';
+import 'note_editor_screen.dart';
+import 'notification_screen.dart';
+import 'statistics_screen.dart'; // Import màn hình thống kê riêng
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -28,34 +26,23 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int selectedTab = 0;
   
-  // SỬA: Khởi tạo các service
   final FirestoreService _db = FirestoreService();
   final AuthService _auth = AuthService();
-  
-  // SỬA: Xóa các biến state cục bộ (sẽ được quản lý bởi StreamBuilder)
-  // String userName = "Đang tải...";
-  // String? userPhotoURL;
-  // ...
-  // List<Category> categories = [];
-
-  // SỬA: Xóa initState và _loadUserData, _loadCategories
-  // Chúng ta sẽ dùng StreamBuilder
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = widget.isDark;
     
-    // SỬA: Lấy stream của user doc để build AppBar/Drawer
+    // Stream chính để lấy thông tin User (Tên, Avatar, Stats)
     return StreamBuilder<DocumentSnapshot>(
-      stream: _db.getUserStream(), // Hàm mới trong service
+      stream: _db.getUserStream(),
       builder: (context, userSnapshot) {
         
-        // Lấy dữ liệu user (hoặc dùng mặc định nếu đang tải)
         String userName = "Đang tải...";
         String? userPhotoURL;
         String userEmail = "";
         int studyStreak = 0;
-        int totalHours = 0;
+        double totalHours = 0.0; 
 
         if (userSnapshot.connectionState == ConnectionState.active && userSnapshot.hasData) {
           final data = userSnapshot.data!.data() as Map<String, dynamic>? ?? {};
@@ -64,14 +51,11 @@ class _HomeScreenState extends State<HomeScreen> {
           userPhotoURL = data['photoURL'];
           userEmail = data['email'] ?? '';
           studyStreak = stats['streak'] ?? 0;
-          
-          // SỬA: totalHours là double, không phải int
-          totalHours = (stats['totalHours'] as num? ?? 0).toInt(); 
+          totalHours = (stats['totalHours'] as num? ?? 0.0).toDouble(); 
         }
 
         return Scaffold(
-          backgroundColor: isDark ? Color(0xFF0F172A) : Colors.grey[100],
-          // SỬA: Truyền dữ liệu user động vào drawer
+          backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.grey[100],
           drawer: _buildDrawer(context, isDark, userName, userEmail, userPhotoURL),
           appBar: AppBar(
             backgroundColor: Colors.transparent,
@@ -90,11 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             centerTitle: true,
-            title: Image.asset(
-              'assets/logo.png', // SỬA: Giả sử logo của bạn ở 'assets/logo.png'
-              height: 32,
-              fit: BoxFit.contain,
-            ),
+            // Thay đổi tiêu đề dựa trên tab đang chọn
+            title: _buildAppBarTitle(selectedTab, isDark),
             actions: [
               IconButton(
                 icon: Icon(
@@ -103,13 +84,56 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 onPressed: () {},
               ),
-              IconButton(
-                icon: Icon(
-                  Icons.notifications_outlined,
-                  color: isDark ? Colors.white : Colors.black87,
+              // Nút thông báo (Chỉ hiện ở tab Trang chủ để đỡ rối)
+              if (selectedTab == 0)
+                StreamBuilder<int>(
+                  stream: _db.getUnreadNotificationsCount(),
+                  builder: (context, snapshot) {
+                    int unreadCount = snapshot.data ?? 0;
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.notifications_outlined,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                            );
+                          },
+                        ),
+                        if (unreadCount > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                '$unreadCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                      ],
+                    );
+                  },
                 ),
-                onPressed: () {},
-              ),
             ],
           ),
           bottomNavigationBar: BottomNavigationBar(
@@ -117,24 +141,125 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: (i) {
               setState(() => selectedTab = i);
             },
-            type: BottomNavigationBarType.fixed, // Đảm bảo label luôn hiển thị
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: Colors.indigo,
+            unselectedItemColor: Colors.grey,
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.bar_chart),
-                label: 'Thống kê',
-              ),
+              BottomNavigationBarItem(icon: Icon(Icons.note_alt), label: 'Ghi chú'),
+              BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Thống kê'),
             ],
           ),
-          // SỬA: Truyền dữ liệu user động vào các tab
-          body: selectedTab == 0
-              ? _buildHomeContent(context, userName, userPhotoURL, studyStreak, totalHours)
-              : _buildStatistics(context, userSnapshot),
+          
+          // Body thay đổi theo Tab
+          body: _buildBody(selectedTab, context, userName, userPhotoURL, studyStreak, totalHours.toInt(), userSnapshot),
+          
+          // Nút FAB chỉ hiện ở trang chủ (Trang Ghi chú có FAB riêng bên trong)
+          floatingActionButton: selectedTab == 0 
+            ? FloatingActionButton(
+                onPressed: () => _showAddOptions(context),
+                child: const Icon(Icons.add),
+              )
+            : null,
         );
       },
     );
   }
 
+  Widget _buildAppBarTitle(int tabIndex, bool isDark) {
+    if (tabIndex == 1) {
+      return Text('Ghi chú', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold));
+    } else if (tabIndex == 2) {
+      return Text('Thống kê', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold));
+    }
+    return Image.asset(
+      'assets/images/StudyMateRemoveBG.png',
+      height: 32,
+      fit: BoxFit.contain,
+    );
+  }
+
+  Widget _buildBody(int tabIndex, BuildContext context, String userName, String? userPhotoURL, int studyStreak, int totalHours, AsyncSnapshot<DocumentSnapshot> userSnapshot) {
+    switch (tabIndex) {
+      case 0:
+        return _buildHomeContent(context, userName, userPhotoURL, studyStreak, totalHours);
+      case 1:
+        return const NotesListScreen(); // Màn hình ghi chú
+      case 2:
+        // Lấy dữ liệu stats từ snapshot và truyền vào màn hình thống kê riêng
+        final stats = (userSnapshot.data?.data() as Map<String, dynamic>?)?['stats'] as Map<String, dynamic>? ?? {};
+        return StatisticsScreen(userStats: stats); 
+      default:
+        return const SizedBox();
+    }
+  }
+
+  // --- Bottom Sheet chọn tạo mới ---
+  void _showAddOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    'Bạn muốn tạo gì?',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.style, color: Colors.indigo),
+                  ),
+                  title: const Text('Bộ thẻ mới (Flashcard)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Tạo chủ đề để học từ vựng'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showAddSetDialog(context);
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.note_alt, color: Colors.orange),
+                  ),
+                  title: const Text('Ghi chú mới (Note)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Viết ghi chú nhanh'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const NoteEditorScreen()),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- Nội dung Trang chủ (Flashcards) ---
   Widget _buildHomeContent(
     BuildContext context,
     String userName,
@@ -149,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 👤 Thông tin người dùng (Đã Cập Nhật) ---
+          // Header User Info
           Row(
             children: [
               CircleAvatar(
@@ -190,7 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 20),
 
-          // --- 📊 Thống kê nhanh (Đã Cập Nhật) ---
+          // Thẻ thống kê nhanh (Mini stats)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -210,18 +335,12 @@ class _HomeScreenState extends State<HomeScreen> {
           
           _buildSectionHeader(
             'Thư mục của tôi',
-            // SỬA: Nút "Thêm" sẽ gọi dialog
-            onPressed: () => _showAddSetDialog(context),
+            onPressed: () => _showAddOptions(context),
           ),
 
-          //
-          // =================================================================
-          // SỬA LỖI QUAN TRỌNG NHẤT:
-          // Dùng StreamBuilder để tải danh sách bộ thẻ (FlashcardSet)
-          // =================================================================
-          //
+          // Danh sách Bộ thẻ
           StreamBuilder<List<FlashcardSet>>(
-            stream: _db.getFlashcardSetsStream(), // Hàm mới trong service
+            stream: _db.getFlashcardSetsStream(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
@@ -231,23 +350,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               }
-
               if (snapshot.hasError) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Text(
-                      'Lỗi tải chủ đề: ${snapshot.error}',
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                );
+                return Center(child: Text('Lỗi: ${snapshot.error}'));
               }
 
-              final sets = snapshot.data;
+              final sets = snapshot.data ?? [];
 
-              if (sets == null || sets.isEmpty) {
+              if (sets.isEmpty) {
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32.0),
@@ -261,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Nhấn "Thêm" để tạo chủ đề mới',
+                          'Nhấn nút "+" để tạo mới',
                           style: TextStyle(color: Colors.grey),
                         ),
                       ],
@@ -270,11 +379,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }
 
-              // Hiển thị danh sách chủ đề
               return Column(
-                children: sets.map((set) => _buildCourseCard(
-                  set, // SỬA: Dùng model FlashcardSet
-                  // SỬA: Dùng set.cardCount
+                children: sets.map<Widget>((set) => _buildCourseCard(
+                  set,
                   '${set.cardCount} thuật ngữ',
                   Color(int.tryParse(set.color.replaceFirst('#', '0xFF')) ?? 0xFF4CAF50),
                 )).toList(),
@@ -287,13 +394,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Hàm thêm chủ đề (FlashcardSet)
+  // --- Các Widget & Hàm phụ trợ ---
+
   void _showAddSetDialog(BuildContext context) {
     final nameController = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Thêm chủ đề mới'),
+        title: const Text('Thêm chủ đề mới'),
         content: TextField(
           controller: nameController,
           decoration: const InputDecoration(labelText: 'Tên chủ đề'),
@@ -305,14 +413,11 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () async {
               String name = nameController.text.trim();
               if (name.isEmpty) return;
-              
               try {
-                // SỬA: Gọi hàm service chính xác
                 await _db.addFlashcardSet(name); 
                 if (context.mounted) Navigator.pop(ctx);
               } catch (e) {
-                 ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
               }
             },
             child: const Text('Thêm'),
@@ -322,7 +427,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ... (Các hàm _buildStatCard, _buildSectionHeader, _buildCourseCard, _showCategoryOptions, _buildOptionTile, _buildStatistics giữ nguyên) ...
   Widget _buildStatCard(String title, String value, Color color) {
     return Expanded(
       child: Container(
@@ -365,7 +469,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Dùng model FlashcardSet
   Widget _buildCourseCard(FlashcardSet set, String subtitle, Color color) {
     return InkWell(
       onTap: () => _showCategoryOptions(context, set),
@@ -374,7 +477,6 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          // SỬA: Dùng màu từ DB
           color: color.withOpacity(0.5), 
           borderRadius: BorderRadius.circular(16),
         ),
@@ -387,11 +489,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    set.title, // SỬA: Dùng set.title
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                    set.title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   if (subtitle.isNotEmpty)
                     Text(
@@ -411,7 +510,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Dùng model FlashcardSet
   void _showCategoryOptions(BuildContext context, FlashcardSet set) {
     showModalBottomSheet(
       context: context,
@@ -428,107 +526,40 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ... (Thanh kéo và tiêu đề) ...
                 Container(
-                  width: 40,
-                  height: 4,
+                  width: 40, height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
                 ),
-                Text(
-                  set.title, // SỬA
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(set.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text(
-                  '${set.cardCount} flashcard', // SỬA
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
+                Text('${set.cardCount} flashcard', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                 const SizedBox(height: 24),
                 
-                // SỬA: Truyền FlashcardSet (đổi tên từ category)
-                _buildOptionTile(
-                  ctx,
-                  icon: Icons.style,
-                  title: 'Xem Flashcard',
-                  subtitle: 'Xem và quản lý tất cả flashcard',
-                  color: Colors.indigo,
-                  onTap: () {
+                _buildOptionTile(ctx, Icons.style, 'Xem Flashcard', 'Xem và quản lý tất cả flashcard', Colors.indigo, () {
                     Navigator.pop(ctx);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            FlashcardsScreen(category: set), // SỬA
-                      ),
-                    );
-                  },
-                ),
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => FlashcardsScreen(set: set)));
+                }),
                 const SizedBox(height: 12),
-                _buildOptionTile(
-                  ctx,
-                  icon: Icons.school,
-                  title: 'Chế độ học',
-                  subtitle: 'Học và ghi nhớ flashcard',
-                  color: Colors.green,
-                  onTap: () async {
+                _buildOptionTile(ctx, Icons.school, 'Chế độ học', 'Học và ghi nhớ flashcard', Colors.green, () async {
                     Navigator.pop(ctx);
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            LearningScreen(category: set), // SỬA
-                      ),
-                    );
-                  },
-                ),
+                    await Navigator.push(context, MaterialPageRoute(builder: (context) => LearningScreen(set: set)));
+                }),
                 const SizedBox(height: 12),
-                _buildOptionTile(
-                  ctx,
-                  icon: Icons.quiz,
-                  title: 'Làm Quiz',
-                  subtitle: 'Kiểm tra kiến thức của bạn',
-                  color: Colors.orange,
-                  onTap: () async {
+                _buildOptionTile(ctx, Icons.quiz, 'Làm Quiz', 'Kiểm tra kiến thức của bạn', Colors.orange, () async {
                     Navigator.pop(ctx);
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => QuizModeSelectionScreen(category: set), // SỬA
-                      ),
-                    );
-                  },
-                ),
+                    await Navigator.push(context, MaterialPageRoute(builder: (context) => QuizModeSelectionScreen(set: set)));
+                }),
                 const Divider(height: 24),
-                _buildOptionTile(
-                  ctx,
-                  icon: Icons.edit,
-                  title: 'Đổi tên chủ đề',
-                  subtitle: 'Sửa tên cho chủ đề này',
-                  color: Colors.blueGrey,
-                  onTap: () {
+                _buildOptionTile(ctx, Icons.edit, 'Đổi tên chủ đề', 'Sửa tên cho chủ đề này', Colors.blueGrey, () {
                     Navigator.pop(ctx);
-                    _showEditSetDialog(context, set); // SỬA
-                  },
-                ),
+                    _showEditSetDialog(context, set);
+                }),
                 const SizedBox(height: 12),
-                _buildOptionTile(
-                  ctx,
-                  icon: Icons.delete,
-                  title: 'Xóa chủ đề',
-                  subtitle: 'Xóa chủ đề và tất cả thẻ bên trong',
-                  color: Colors.red,
-                  onTap: () {
+                _buildOptionTile(ctx, Icons.delete, 'Xóa chủ đề', 'Xóa chủ đề và tất cả thẻ bên trong', Colors.red, () {
                     Navigator.pop(ctx);
-                    _showDeleteSetDialog(context, set); // SỬA
-                  },
-                ),
+                    _showDeleteSetDialog(context, set);
+                }),
                 SizedBox(height: MediaQuery.of(context).padding.bottom + 10),
               ],
             ),
@@ -538,32 +569,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Hàm sửa chủ đề (FlashcardSet)
   void _showEditSetDialog(BuildContext context, FlashcardSet set) {
     final nameController = TextEditingController(text: set.title);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Sửa tên chủ đề'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(labelText: 'Tên chủ đề'),
-          autofocus: true,
-        ),
+        title: const Text('Sửa tên chủ đề'),
+        content: TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Tên chủ đề'), autofocus: true),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
           ElevatedButton(
             onPressed: () async {
               String name = nameController.text.trim();
               if (name.isEmpty) return;
-              
               try {
-                // SỬA: Gọi hàm service chính xác
                 await _db.updateFlashcardSetTitle(set.id, name);
                 if (context.mounted) Navigator.pop(ctx);
               } catch(e) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
               }
             },
             child: const Text('Lưu'),
@@ -573,25 +596,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // SỬA: Hàm xóa chủ đề (FlashcardSet)
   void _showDeleteSetDialog(BuildContext context, FlashcardSet set) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Xác nhận xóa'),
-        content: Text(
-            'Bạn có chắc chắn muốn xóa chủ đề "${set.title}" không? Toàn bộ flashcard bên trong cũng sẽ bị xóa vĩnh viễn.'),
+        title: const Text('Xác nhận xóa'),
+        content: Text('Bạn có chắc chắn muốn xóa chủ đề "${set.title}" không? Toàn bộ flashcard bên trong cũng sẽ bị xóa vĩnh viễn.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
           ElevatedButton(
             onPressed: () async {
               try {
-                // SỬA: Gọi hàm service chính xác
                 await _db.deleteFlashcardSet(set.id);
                 if (context.mounted) Navigator.pop(ctx);
               } catch (e) {
-                 ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -602,14 +621,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildOptionTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildOptionTile(BuildContext context, IconData icon, String title, String subtitle, Color color, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -624,10 +636,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
+              decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
               child: Icon(icon, color: color, size: 24),
             ),
             const SizedBox(width: 16),
@@ -635,19 +644,9 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
+                  Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
                   const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
+                  Text(subtitle, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                 ],
               ),
             ),
@@ -657,192 +656,15 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  // SỬA: Đơn giản hóa tab Thống kê
-  // Nó sẽ dùng dữ liệu từ user snapshot thay vì một Future riêng
-  Widget _buildStatistics(BuildContext context, AsyncSnapshot<DocumentSnapshot> userSnapshot) {
-     if (userSnapshot.connectionState == ConnectionState.waiting) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      if (userSnapshot.hasError) {
-        return Center(child: Text('Lỗi tải thống kê: ${userSnapshot.error}'));
-      }
-      
-      final data = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
-      final stats = data['stats'] as Map<String, dynamic>? ?? {};
-
-      final streak = stats['streak'] ?? 0;
-      final totalHours = (stats['totalHours'] as num? ?? 0.0);
-      final totalNotes = stats['totalNotes'] ?? 0;
-      final totalFlashcards = stats['totalFlashcards'] ?? 0;
-
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 8),
-          const Text(
-            'Thống kê học tập',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 24),
-          
-          // Main Stats Cards
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCardLarge(
-                  'Chuỗi ngày học',
-                  '$streak',
-                  'ngày',
-                  Colors.pink,
-                  Icons.local_fire_department,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCardLarge(
-                  'Tổng giờ học',
-                  totalHours.toStringAsFixed(1),
-                  'giờ',
-                  Colors.green,
-                  Icons.access_time,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // ... (Bạn có thể thêm các thẻ khác ở đây nếu muốn) ...
-          
-          const SizedBox(height: 24),
-          
-          // Activity Summary
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Tổng quan hoạt động',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildActivityRow('Tổng flashcard', '$totalFlashcards', Icons.style, Colors.blue),
-                const SizedBox(height: 12),
-                _buildActivityRow('Tổng ghi chú', '$totalNotes', Icons.note_alt, Colors.orange),
-                const SizedBox(height: 12),
-                _buildActivityRow('Tổng giờ học', '${totalHours.toStringAsFixed(1)} giờ', Icons.timer, Colors.green),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          
-          // ... (Phần Lịch sử học tập gần đây có thể thêm sau) ...
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCardLarge(String title, String value, String unit, Color color, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withOpacity(0.7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: Colors.white, size: 32),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          Text(
-            unit,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
   
-  Widget _buildActivityRow(String title, String value, IconData icon, Color color) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 12),
-        Text(title, style: const TextStyle(fontSize: 16)),
-        const Spacer(),
-        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
-  // --- Drawer menu (Đã Cập Nhật) ---
-  Widget _buildDrawer(
-    BuildContext context,
-    bool isDark,
-    String userName,
-    String userEmail,
-    String? userPhotoURL,
-  ) {
+  // Drawer
+  Widget _buildDrawer(BuildContext context, bool isDark, String userName, String userEmail, String? userPhotoURL) {
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.indigo, Colors.indigo.shade700],
-              ),
-            ),
+            decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.indigo, Colors.indigo.shade700])),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
@@ -850,81 +672,46 @@ class _HomeScreenState extends State<HomeScreen> {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
-                  backgroundImage: (userPhotoURL != null && userPhotoURL.isNotEmpty)
-                      ? NetworkImage(userPhotoURL)
-                      : null,
-                  child: (userPhotoURL != null && userPhotoURL.isNotEmpty)
-                      ? null
-                      : Text(
-                          (userName.isNotEmpty) ? userName[0].toUpperCase() : '?',
-                          style: const TextStyle(
-                            color: Colors.indigo,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                  backgroundImage: (userPhotoURL != null && userPhotoURL.isNotEmpty) ? NetworkImage(userPhotoURL) : null,
+                  child: (userPhotoURL != null && userPhotoURL.isNotEmpty) ? null : Text((userName.isNotEmpty) ? userName[0].toUpperCase() : '?', style: const TextStyle(color: Colors.indigo, fontSize: 32, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  userName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(userName, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(
-                  userEmail,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 14,
-                  ),
-                ),
+                Text(userEmail, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
               ],
             ),
           ),
           ListTile(
             leading: const Icon(Icons.home, color: Colors.indigo),
             title: const Text('Trang chủ'),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() { selectedTab = 0; });
-            },
+            onTap: () { Navigator.pop(context); setState(() { selectedTab = 0; }); },
+          ),
+          ListTile(
+            leading: const Icon(Icons.note_alt, color: Colors.indigo),
+            title: const Text('Ghi chú'),
+            onTap: () { Navigator.pop(context); setState(() { selectedTab = 1; }); },
           ),
           ListTile(
             leading: const Icon(Icons.auto_awesome, color: Colors.indigo),
             title: const Text('AI Assistant'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AIAssistantScreen(),
-                ),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const AIAssistantScreen()));
             },
           ),
           ListTile(
             leading: const Icon(Icons.bar_chart, color: Colors.indigo),
             title: const Text('Thống kê'),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() { selectedTab = 1; });
-            },
+            onTap: () { Navigator.pop(context); setState(() { selectedTab = 2; }); },
           ),
           const Divider(),
           ListTile(
-            leading: Icon(
-              isDark ? Icons.light_mode : Icons.dark_mode,
-              color: Colors.indigo,
-            ),
+            leading: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: Colors.indigo),
             title: Text(isDark ? 'Chế độ sáng' : 'Chế độ tối'),
             onTap: () {
               Navigator.pop(context);
-              if (widget.onToggleTheme != null) {
-                widget.onToggleTheme!();
-              }
+              if (widget.onToggleTheme != null) widget.onToggleTheme!();
             },
           ),
           ListTile(
@@ -932,15 +719,7 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text('Cài đặt'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SettingsScreen(
-                    onToggleTheme: widget.onToggleTheme,
-                    isDark: widget.isDark,
-                  ),
-                ),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => SettingsScreen(onToggleTheme: widget.onToggleTheme, isDark: widget.isDark)));
             },
           ),
           ListTile(
@@ -948,30 +727,23 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text('Trợ giúp'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const HelpScreen()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const HelpScreen()));
             },
           ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text(
-              'Đăng xuất',
-              style: TextStyle(color: Colors.redAccent),
-            ),
+            title: const Text('Đăng xuất', style: TextStyle(color: Colors.redAccent)),
             onTap: () {
               Navigator.pop(context);
-              _showLogoutDialog(context); // SỬA: Gọi hàm dialog
+              _showLogoutDialog(context);
             },
           ),
         ],
       ),
     );
   }
-  
-  // SỬA: Thêm hàm dialog Đăng xuất
+
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -979,16 +751,11 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Đăng xuất'),
         content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Huỷ'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
               await _auth.signOut();
-              // App sẽ tự động điều hướng về màn hình login
-              // (do logic trong main.dart)
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Đăng xuất'),

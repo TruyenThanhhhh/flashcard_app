@@ -1,10 +1,7 @@
-// lib/services/auth_service.dart
-
-import 'package.firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package.flutter/foundation.dart' show kIsWeb;
-// SỬA: Import service của chúng ta
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'user_service.dart'; 
 
 class AuthService {
@@ -15,7 +12,6 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  // --- ĐĂNG KÝ EMAIL/PASSWORD ---
   Future<UserCredential?> signUpWithEmail(
     String email,
     String password,
@@ -23,7 +19,6 @@ class AuthService {
     String username,
   ) async {
     try {
-      // (Giữ nguyên logic check username)
       final usernameQuery = await _firestore
           .collection('users')
           .where('username', isEqualTo: username)
@@ -38,11 +33,9 @@ class AuthService {
           .createUserWithEmailAndPassword(email: email, password: password);
 
       await userCredential.user?.updateDisplayName(name);
-      // Tải lại user để đảm bảo displayName được cập nhật
       await userCredential.user?.reload(); 
-      final user = _auth.currentUser; // Lấy user đã cập nhật
+      final user = _auth.currentUser;
 
-      // SỬA: Gọi service của chúng ta
       if (user != null) {
         await initializeUserData(user, username: username);
       }
@@ -57,7 +50,6 @@ class AuthService {
     }
   }
 
-  // --- ĐĂNG NHẬP BẰNG EMAIL HOẶC USERNAME ---
   Future<UserCredential?> signInWithEmailOrUsername(
     String loginId,
     String password,
@@ -65,7 +57,6 @@ class AuthService {
     try {
       String email = loginId;
 
-      // (Giữ nguyên logic check username)
       if (!loginId.contains('@')) {
         final usernameQuery = await _firestore
             .collection('users')
@@ -84,8 +75,6 @@ class AuthService {
         password: password,
       );
 
-      // SỬA: Gọi service của chúng ta. 
-      // Hàm này sẽ tự động xử lý (chỉ cập nhật lastLogin)
       if (userCredential.user != null) {
         await initializeUserData(userCredential.user!);
       }
@@ -102,18 +91,16 @@ class AuthService {
     }
   }
 
-  // --- ĐĂNG NHẬP GOOGLE ---
   Future<UserCredential?> signInWithGoogle() async {
     try {
       UserCredential? userCredential;
 
-      // (Giữ nguyên logic Web/Mobile)
       if (kIsWeb) {
         GoogleAuthProvider googleProvider = GoogleAuthProvider();
         userCredential = await _auth.signInWithPopup(googleProvider);
       } else {
         final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        if (googleUser == null) return null; // Người dùng hủy
+        if (googleUser == null) return null;
 
         final GoogleSignInAuthentication googleAuth =
             await googleUser.authentication;
@@ -128,8 +115,6 @@ class AuthService {
         throw "Đăng nhập Google thất bại.";
       }
 
-      // SỬA: Gọi service của chúng ta
-      // Hàm này sẽ tự động xử lý (tạo user mới hoặc cập nhật user cũ)
       await initializeUserData(userCredential.user!);
 
       return userCredential;
@@ -140,12 +125,8 @@ class AuthService {
     }
   }
 
-  // --- ĐĂNG XUẤT ---
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
   }
-
-  // SỬA: ĐÃ XÓA TOÀN BỘ HÀM _saveUserToFirestore
-  // Vì logic của nó đã được chuyển vào `user_service.dart`
 }
