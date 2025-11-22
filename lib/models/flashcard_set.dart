@@ -10,6 +10,9 @@ class FlashcardSet {
   final String color;
   final int cardCount;
   final String folder_id;
+  final bool isPublic;
+  final String? userId; // For public lessons, to identify the creator
+  final String? creatorName; // For public lessons, to show creator name
 
   FlashcardSet({
     required this.id,
@@ -18,6 +21,9 @@ class FlashcardSet {
     required this.color,
     required this.cardCount,
     required this.folder_id,
+    this.isPublic = false,
+    this.userId,
+    this.creatorName,
   });
 
   factory FlashcardSet.fromFirestore(DocumentSnapshot doc) {
@@ -30,6 +36,9 @@ class FlashcardSet {
       color: data['color'] ?? '#808080',
       cardCount: data['cardCount'] ?? 0,
       folder_id: data['folder_id'] ?? 'root',
+      isPublic: data['isPublic'] ?? false,
+      userId: data['userId'],
+      creatorName: data['creatorName'],
     );
   }
 }

@@ -14,6 +14,8 @@ import 'notes_list_screen.dart';
 import 'note_editor_screen.dart';
 import 'notification_screen.dart';
 import 'statistics_screen.dart'; // Import màn hình thống kê riêng
+import 'folders_list_screen.dart';
+import 'public_lessons_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -147,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
-              BottomNavigationBarItem(icon: Icon(Icons.note_alt), label: 'Ghi chú'),
+              BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Học tập'),
               BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Thống kê'),
             ],
           ),
@@ -169,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildAppBarTitle(int tabIndex, bool isDark) {
     if (tabIndex == 1) {
-      return Text('Ghi chú', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold));
+      return Text('Học tập', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold));
     } else if (tabIndex == 2) {
       return Text('Thống kê', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold));
     }
@@ -185,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         return _buildHomeContent(context, userName, userPhotoURL, studyStreak, totalHours);
       case 1:
-        return const NotesListScreen(); // Màn hình ghi chú
+        return const PublicLessonsScreen(); // Màn hình học tập - bài học công khai
       case 2:
         // Lấy dữ liệu stats từ snapshot và truyền vào màn hình thống kê riêng
         final stats = (userSnapshot.data?.data() as Map<String, dynamic>?)?['stats'] as Map<String, dynamic>? ?? {};
@@ -333,58 +335,29 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 25),
           
-          _buildSectionHeader(
+          // My Folders and My Notes cards
+          _buildHomeItemCard(
+            context,
             'Thư mục của tôi',
-            onPressed: () => _showAddOptions(context),
+            Icons.folder,
+            Colors.blue,
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FoldersListScreen()),
+              );
+            },
           ),
-
-          // Danh sách Bộ thẻ
-          StreamBuilder<List<FlashcardSet>>(
-            stream: _db.getFlashcardSetsStream(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-              if (snapshot.hasError) {
-                return Center(child: Text('Lỗi: ${snapshot.error}'));
-              }
-
-              final sets = snapshot.data ?? [];
-
-              if (sets.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      children: [
-                        Icon(Icons.folder_open, size: 64, color: Colors.grey),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Chưa có chủ đề nào',
-                          style: TextStyle(fontSize: 18, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Nhấn nút "+" để tạo mới',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              return Column(
-                children: sets.map<Widget>((set) => _buildCourseCard(
-                  set,
-                  '${set.cardCount} thuật ngữ',
-                  Color(int.tryParse(set.color.replaceFirst('#', '0xFF')) ?? 0xFF4CAF50),
-                )).toList(),
+          const SizedBox(height: 16),
+          _buildHomeItemCard(
+            context,
+            'Ghi chú của tôi',
+            Icons.note_alt,
+            Colors.orange,
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NotesListScreen()),
               );
             },
           ),
@@ -398,31 +371,60 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showAddSetDialog(BuildContext context) {
     final nameController = TextEditingController();
+    bool isPublic = false;
+    
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Thêm chủ đề mới'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(labelText: 'Tên chủ đề'),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
-          ElevatedButton(
-            onPressed: () async {
-              String name = nameController.text.trim();
-              if (name.isEmpty) return;
-              try {
-                await _db.addFlashcardSet(name); 
-                if (context.mounted) Navigator.pop(ctx);
-              } catch (e) {
-                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-              }
-            },
-            child: const Text('Thêm'),
-          ),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Thêm chủ đề mới'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Tên chủ đề'),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: isPublic,
+                      onChanged: (value) {
+                        setState(() {
+                          isPublic = value ?? false;
+                        });
+                      },
+                    ),
+                    const Expanded(
+                      child: Text('Công khai (người khác có thể xem và học)'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
+              ElevatedButton(
+                onPressed: () async {
+                  String name = nameController.text.trim();
+                  if (name.isEmpty) return;
+                  try {
+                    await _db.addFlashcardSet(name, isPublic: isPublic); 
+                    if (context.mounted) Navigator.pop(ctx);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                    }
+                  }
+                },
+                child: const Text('Thêm'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -444,6 +446,56 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(title, style: const TextStyle(color: Colors.black54)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeItemCard(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) {
+    final isDark = widget.isDark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 18,
+              color: Colors.grey[400],
+            ),
           ],
         ),
       ),
@@ -688,8 +740,8 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () { Navigator.pop(context); setState(() { selectedTab = 0; }); },
           ),
           ListTile(
-            leading: const Icon(Icons.note_alt, color: Colors.indigo),
-            title: const Text('Ghi chú'),
+            leading: const Icon(Icons.school, color: Colors.indigo),
+            title: const Text('Học tập'),
             onTap: () { Navigator.pop(context); setState(() { selectedTab = 1; }); },
           ),
           ListTile(

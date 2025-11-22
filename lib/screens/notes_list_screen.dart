@@ -14,6 +14,12 @@ class NotesListScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: Text('Ghi chú của tôi', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
+      ),
       body: StreamBuilder<List<Note>>(
         stream: db.getNotesStream(),
         builder: (context, snapshot) {
