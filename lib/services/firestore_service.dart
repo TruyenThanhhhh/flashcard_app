@@ -1,9 +1,12 @@
+import 'dart:math'; // Để random ID
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/flashcard_set.dart';
 import '../models/flashcard.dart';
 import '../models/note.dart';
 import '../models/app_notification.dart';
+import '../models/study_reminder.dart'; // Import model StudyReminder
+import '../services/notification_service.dart'; // Import NotificationService
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -354,6 +357,86 @@ class FirestoreService {
         .collection('notifications')
         .doc(notificationId)
         .delete();
+  }
+
+  // ==================================================
+  // === REMINDERS (NHẮC NHỞ) - Đã thêm mới ===
+  // ==================================================
+  
+  Stream<List<StudyReminder>> getRemindersStream() {
+    if (_uid == null) return Stream.value([]);
+    return _db.collection('users').doc(_uid).collection('reminders')
+        .orderBy('hour').orderBy('minute')
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => StudyReminder.fromFirestore(doc)).toList());
+  }
+
+  Future<void> addReminder(String title, int hour, int minute, List<int> weekDays) async {
+    if (_uid == null) return;
+    
+    // Tạo ID ngẫu nhiên cho Notification
+    int notificationId = Random().nextInt(100000); 
+    
+    DocumentReference docRef = await _db.collection('users').doc(_uid).collection('reminders').add({
+      'title': title,
+      'hour': hour,
+      'minute': minute,
+      'weekDays': weekDays,
+      'isEnabled': true,
+      'notificationId': notificationId,
+    });
+    
+    // Lên lịch ngay lập tức
+    StudyReminder newReminder = StudyReminder(
+      id: docRef.id, 
+      title: title, 
+      hour: hour, 
+      minute: minute,
+      weekDays: weekDays, 
+      isEnabled: true, 
+      notificationId: notificationId,
+    );
+    await NotificationService().scheduleReminder(newReminder);
+  }
+
+  Future<void> updateReminder(StudyReminder reminder) async {
+    if (_uid == null) return;
+    
+    await _db.collection('users').doc(_uid).collection('reminders').doc(reminder.id).update(reminder.toMap());
+    
+    // Cập nhật lại lịch (hàm schedule sẽ tự hủy lịch cũ và đặt lịch mới)
+    await NotificationService().scheduleReminder(reminder);
+  }
+
+  Future<void> toggleReminder(StudyReminder reminder, bool isEnabled) async {
+    if (_uid == null) return;
+    
+    await _db.collection('users').doc(_uid).collection('reminders').doc(reminder.id).update({'isEnabled': isEnabled});
+    
+    StudyReminder updated = StudyReminder(
+      id: reminder.id, 
+      title: reminder.title, 
+      hour: reminder.hour, 
+      minute: reminder.minute,
+      weekDays: reminder.weekDays, 
+      isEnabled: isEnabled, 
+      notificationId: reminder.notificationId
+    );
+
+    if (isEnabled) {
+      await NotificationService().scheduleReminder(updated);
+    } else {
+      await NotificationService().cancelReminder(updated);
+    }
+  }
+
+  Future<void> deleteReminder(StudyReminder reminder) async {
+    if (_uid == null) return;
+    
+    await _db.collection('users').doc(_uid).collection('reminders').doc(reminder.id).delete();
+    
+    // Hủy thông báo
+    await NotificationService().cancelReminder(reminder);
   }
 
   // ==================================================

@@ -56,10 +56,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 isDark: widget.isDark,
               );
             }
-            
-            // 2. Chưa đăng nhập
-            // Đây là nơi sửa lỗi "bàn phím"
-            // Vì LoginScreen không còn bị bọc bởi StreamBuilder nữa
             return const LoginScreen();
           },
         );

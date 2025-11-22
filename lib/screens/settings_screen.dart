@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import '../services/notification_service.dart'; // MỚI: Import NotificationService
+import 'profile_screen.dart';
+import 'change_password_screen.dart';
+import 'reminder_list_screen.dart'; // Import màn hình danh sách nhắc nhở
 
 class SettingsScreen extends StatelessWidget {
   final VoidCallback? onToggleTheme;
@@ -36,7 +38,7 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // === PHẦN TÀI KHOẢN ===
+          // === TÀI KHOẢN ===
           _buildSectionHeader('Tài khoản', isDarkTheme),
           _buildSettingsCard(
             context,
@@ -49,7 +51,10 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Thông tin cá nhân',
                 subtitle: 'Xem và chỉnh sửa thông tin tài khoản',
                 onTap: () {
-                  _showComingSoon(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
                 },
               ),
               const Divider(height: 1),
@@ -60,14 +65,17 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Bảo mật',
                 subtitle: 'Đổi mật khẩu và quản lý bảo mật',
                 onTap: () {
-                  _showComingSoon(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
+                  );
                 },
               ),
             ],
           ),
           const SizedBox(height: 24),
           
-          // === PHẦN CÀI ĐẶT ỨNG DỤNG ===
+          // === CÀI ĐẶT ỨNG DỤNG ===
           _buildSectionHeader('Cài đặt ứng dụng', isDarkTheme),
           _buildSettingsCard(
             context,
@@ -76,7 +84,6 @@ class SettingsScreen extends StatelessWidget {
                _buildSettingsTile(
                 context,
                 isDarkTheme,
-                // Icon thay đổi tùy theo theme
                 icon: isDarkTheme ? Icons.light_mode : Icons.dark_mode,
                 title: 'Chế độ hiển thị',
                 subtitle: isDarkTheme ? 'Đang ở chế độ tối' : 'Đang ở chế độ sáng',
@@ -84,38 +91,26 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(height: 1),
               
-              // MỚI: TÍCH HỢP NOTIFICATION SERVICE
+              // LIÊN KẾT ĐẾN DANH SÁCH NHẮC NHỞ
               _buildSettingsTile(
                 context,
                 isDarkTheme,
                 icon: Icons.notifications_active,
                 title: 'Nhắc nhở học tập',
-                subtitle: 'Nhắc học bài lúc 20:00 hàng ngày',
-                onTap: () async {
-                  // 1. Lên lịch thông báo
-                  await NotificationService().scheduleDailyNotification();
-                  
-                  // 2. (Tùy chọn) Gửi thử 1 thông báo ngay lập tức để test
-                  // await NotificationService().showInstantNotification(
-                  //   title: "Đã bật nhắc nhở!", 
-                  //   body: "Bạn sẽ nhận được thông báo vào 20:00 mỗi ngày."
-                  // );
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Đã đặt lịch nhắc nhở hàng ngày!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
+                subtitle: 'Quản lý lịch nhắc nhở',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ReminderListScreen()),
+                  );
                 },
               ),
             ],
           ),
+          
           const SizedBox(height: 24),
 
-          // === PHẦN VỀ ỨNG DỤNG ===
+          // === VỀ ỨNG DỤNG ===
           _buildSectionHeader('Về ứng dụng', isDarkTheme),
           _buildSettingsCard(
             context,
@@ -127,13 +122,13 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.info,
                 title: 'Phiên bản',
                 subtitle: '1.0.0',
-                onTap: null, // Không làm gì khi bấm vào
+                onTap: null, 
               ),
             ],
           ),
           const SizedBox(height: 24),
           
-          // === PHẦN KHÁC (ĐĂNG XUẤT) ===
+          // === KHÁC ===
           _buildSectionHeader('Khác', isDarkTheme),
           _buildSettingsCard(
             context,
@@ -157,7 +152,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // --- CÁC WIDGET PHỤ TRỢ GIỮ NGUYÊN ---
+  // --- CÁC WIDGET PHỤ TRỢ ---
 
   Widget _buildSectionHeader(String title, bool isDark) {
     return Padding(
@@ -179,7 +174,6 @@ class SettingsScreen extends StatelessWidget {
     required List<Widget> children,
   }) {
     return Container(
-      clipBehavior: Clip.antiAlias, // Bo góc cho nội dung bên trong
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -191,8 +185,11 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        children: children,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: children,
+        ),
       ),
     );
   }
@@ -264,7 +261,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final auth = AuthService(); 
+    final auth = AuthService();
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -287,10 +284,7 @@ class SettingsScreen extends StatelessWidget {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Lỗi khi đăng xuất: ${e.toString()}'),
-                      backgroundColor: Colors.red,
-                    ),
+                    SnackBar(content: Text('Lỗi khi đăng xuất: ${e.toString()}'), backgroundColor: Colors.red),
                   );
                 }
               }
