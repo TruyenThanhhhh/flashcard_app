@@ -64,6 +64,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '640450823915',
     projectId: 'vamos-fffa4',
     storageBucket: 'vamos-fffa4.firebasestorage.app',
+    androidClientId: '640450823915-q57kpp0qls6v9607lbkjv0fthqldh1l0.apps.googleusercontent.com',
+    iosClientId: '640450823915-0keiugpqj5sof477m5ch7rtisq4r65ke.apps.googleusercontent.com',
     iosBundleId: 'com.example.flashcardApp',
   );
 
@@ -73,6 +75,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '640450823915',
     projectId: 'vamos-fffa4',
     storageBucket: 'vamos-fffa4.firebasestorage.app',
+    androidClientId: '640450823915-q57kpp0qls6v9607lbkjv0fthqldh1l0.apps.googleusercontent.com',
+    iosClientId: '640450823915-0keiugpqj5sof477m5ch7rtisq4r65ke.apps.googleusercontent.com',
     iosBundleId: 'com.example.flashcardApp',
   );
 
@@ -85,4 +89,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'vamos-fffa4.firebasestorage.app',
     measurementId: 'G-X3F8X3PWWT',
   );
+
 }

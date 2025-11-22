@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart'; // SỬA: Dùng AuthService
-import 'login_screen.dart';
+import '../services/auth_service.dart';
+import 'profile_screen.dart';
+import 'change_password_screen.dart';
+import 'reminder_list_screen.dart'; // Import màn hình danh sách nhắc nhở
 
 class SettingsScreen extends StatelessWidget {
   final VoidCallback? onToggleTheme;
@@ -9,24 +11,26 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Lấy trạng thái theme hiện tại từ hệ thống để hiển thị đúng màu
+    final bool isDarkTheme = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? Color(0xFF0F172A) : Color(0xFFF8FAFC),
+      backgroundColor: isDarkTheme ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: isDark ? Color(0xFF1E293B) : Colors.white,
+        backgroundColor: isDarkTheme ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Cài đặt',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
+            color: isDarkTheme ? Colors.white : Colors.black87,
           ),
         ),
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back,
-            color: isDark ? Colors.white : Color(0xFF1E293B),
+            color: isDarkTheme ? Colors.white : const Color(0xFF1E293B),
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -34,81 +38,105 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ... (Tất cả các mục cài đặt khác giữ nguyên) ...
-          _buildSectionHeader('Tài khoản', isDark),
+          // === TÀI KHOẢN ===
+          _buildSectionHeader('Tài khoản', isDarkTheme),
           _buildSettingsCard(
             context,
-            isDark,
+            isDarkTheme,
             children: [
               _buildSettingsTile(
                 context,
-                isDark,
+                isDarkTheme,
                 icon: Icons.person,
                 title: 'Thông tin cá nhân',
                 subtitle: 'Xem và chỉnh sửa thông tin tài khoản',
                 onTap: () {
-                  _showComingSoon(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
                 },
               ),
               const Divider(height: 1),
               _buildSettingsTile(
                 context,
-                isDark,
+                isDarkTheme,
                 icon: Icons.lock,
                 title: 'Bảo mật',
                 subtitle: 'Đổi mật khẩu và quản lý bảo mật',
                 onTap: () {
-                  _showComingSoon(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
+                  );
                 },
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Cài đặt ứng dụng', isDark),
-          _buildSettingsCard(
-            context,
-            isDark,
-            children: [
-               _buildSettingsTile(
-                context,
-                isDark,
-                icon: Icons.notifications,
-                title: 'Thông báo',
-                subtitle: 'Quản lý thông báo và nhắc nhở',
-                onTap: () {
-                  _showComingSoon(context);
-                },
-              ),
-              // ... (Các mục khác) ...
-            ],
-          ),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Về ứng dụng', isDark),
-          _buildSettingsCard(
-            context,
-            isDark,
-            children: [
-               _buildSettingsTile(
-                context,
-                isDark,
-                icon: Icons.info,
-                title: 'Phiên bản',
-                subtitle: '1.0.0',
-                onTap: null,
-              ),
-              // ... (Các mục khác) ...
             ],
           ),
           const SizedBox(height: 24),
           
-          _buildSectionHeader('Khác', isDark),
+          // === CÀI ĐẶT ỨNG DỤNG ===
+          _buildSectionHeader('Cài đặt ứng dụng', isDarkTheme),
           _buildSettingsCard(
             context,
-            isDark,
+            isDarkTheme,
+            children: [
+               _buildSettingsTile(
+                context,
+                isDarkTheme,
+                icon: isDarkTheme ? Icons.light_mode : Icons.dark_mode,
+                title: 'Chế độ hiển thị',
+                subtitle: isDarkTheme ? 'Đang ở chế độ tối' : 'Đang ở chế độ sáng',
+                onTap: onToggleTheme,
+              ),
+              const Divider(height: 1),
+              
+              // LIÊN KẾT ĐẾN DANH SÁCH NHẮC NHỞ
+              _buildSettingsTile(
+                context,
+                isDarkTheme,
+                icon: Icons.notifications_active,
+                title: 'Nhắc nhở học tập',
+                subtitle: 'Quản lý lịch nhắc nhở',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ReminderListScreen()),
+                  );
+                },
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 24),
+
+          // === VỀ ỨNG DỤNG ===
+          _buildSectionHeader('Về ứng dụng', isDarkTheme),
+          _buildSettingsCard(
+            context,
+            isDarkTheme,
+            children: [
+               _buildSettingsTile(
+                context,
+                isDarkTheme,
+                icon: Icons.info,
+                title: 'Phiên bản',
+                subtitle: '1.0.0',
+                onTap: null, 
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          // === KHÁC ===
+          _buildSectionHeader('Khác', isDarkTheme),
+          _buildSettingsCard(
+            context,
+            isDarkTheme,
             children: [
               _buildSettingsTile(
                 context,
-                isDark,
+                isDarkTheme,
                 icon: Icons.logout,
                 title: 'Đăng xuất',
                 subtitle: 'Đăng xuất khỏi tài khoản',
@@ -123,6 +151,8 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+
+  // --- CÁC WIDGET PHỤ TRỢ ---
 
   Widget _buildSectionHeader(String title, bool isDark) {
     return Padding(
@@ -145,7 +175,7 @@ class SettingsScreen extends StatelessWidget {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Color(0xFF1E293B) : Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -155,8 +185,11 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        children: children,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: children,
+        ),
       ),
     );
   }
@@ -187,7 +220,7 @@ class SettingsScreen extends StatelessWidget {
         title,
         style: TextStyle(
           fontWeight: FontWeight.w600,
-          color: textColor ?? (isDark ? Colors.white : Color(0xFF1E293B)),
+          color: textColor ?? (isDark ? Colors.white : const Color(0xFF1E293B)),
         ),
       ),
       subtitle: subtitle != null
@@ -228,7 +261,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final auth = AuthService(); // SỬA: Dùng AuthService
+    final auth = AuthService();
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -247,25 +280,11 @@ class SettingsScreen extends StatelessWidget {
               Navigator.pop(dialogContext);
               try {
                 await auth.signOut();
-                if (context.mounted) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => LoginScreen(
-                        onToggleTheme: onToggleTheme,
-                        isDark: isDark,
-                      ),
-                    ),
-                    (route) => false,
-                  );
-                }
+                // Không cần làm gì thêm, StreamBuilder ở AuthWrapper sẽ tự điều hướng về LoginScreen
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Lỗi khi đăng xuất: ${e.toString()}'),
-                      backgroundColor: Colors.red,
-                    ),
+                    SnackBar(content: Text('Lỗi khi đăng xuất: ${e.toString()}'), backgroundColor: Colors.red),
                   );
                 }
               }

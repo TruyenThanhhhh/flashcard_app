@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'register_screen.dart';
-// import 'home_screen.dart'; // Không cần import vì main.dart đã xử lý
 
 class LoginScreen extends StatefulWidget {
+  // SỬA: Xóa các tham số theme (vì AuthWrapper sẽ quản lý)
   const LoginScreen({Key? key}) : super(key: key);
 
   @override
@@ -11,7 +11,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Đổi tên controller cho rõ nghĩa
   final _loginIdController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
@@ -22,17 +21,19 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     setState(() => _isLoading = true);
     try {
-      // GỌI HÀM ĐĂNG NHẬP MỚI
       await _authService.signInWithEmailOrUsername(
         _loginIdController.text.trim(),
         _passwordController.text.trim(),
       );
-      // Đăng nhập thành công thì StreamBuilder ở main.dart sẽ tự chuyển trang
+      // AuthWrapper sẽ tự điều hướng
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      // SỬA: Thêm kiểm tra 'mounted'
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
+    // SỬA: Thêm kiểm tra 'mounted'
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -40,13 +41,19 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await _authService.signInWithGoogle();
-      // Tự động chuyển trang nhờ Stream ở main.dart
+      // AuthWrapper sẽ tự điều hướng
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Lỗi Google Sign in: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Lỗi Google Sign in: $e")));
+      }
+    } finally {
+      // SỬA: Dùng 'finally' để đảm bảo _isLoading luôn là false
+      // ngay cả khi người dùng hủy (hàm signIn trả về null)
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-    if (mounted) setState(() => _isLoading = false);
   }
   
   @override
@@ -90,9 +97,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       OutlinedButton.icon(
                         onPressed: _handleGoogleLogin,
                         icon: const Icon(
-                          Icons.login,
+                          Icons.login, // Bạn có thể thay bằng logo Google
                           color: Colors.red,
-                        ), // Bạn có thể thay icon Google xịn hơn
+                        ),
                         label: const Text("Đăng nhập bằng Google"),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(50),
@@ -117,4 +124,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-//new login
