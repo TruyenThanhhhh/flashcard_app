@@ -13,7 +13,7 @@ import 'help_screen.dart';
 import 'notes_list_screen.dart';
 import 'note_editor_screen.dart';
 import 'notification_screen.dart';
-import 'statistics_screen.dart'; // Import màn hình thống kê riêng
+import 'statistics_screen.dart';
 import 'folders_list_screen.dart';
 import 'public_lessons_screen.dart';
 
@@ -34,8 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-    
-    // Stream chính để lấy thông tin User (Tên, Avatar, Stats)
     return StreamBuilder<DocumentSnapshot>(
       stream: _db.getUserStream(),
       builder: (context, userSnapshot) {
@@ -297,8 +295,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
               ),
               const SizedBox(width: 12),
-              
-              // 🔥 FIX LỖI TRÀN TÊN: Dùng Expanded + TextOverflow
               Expanded(
                 child: Text(
                   userName,
@@ -344,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // My Folders and My Notes cards
           _buildHomeItemCard(
             context,
-            'Thư mục của tôi',
+            'Flashcard của tôi',
             Icons.folder,
             Colors.blue,
             () {
