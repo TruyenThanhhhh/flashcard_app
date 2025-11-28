@@ -2,15 +2,12 @@
 
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-// SỬA: Dùng model mới
 import '../models/flashcard_set.dart';
 import '../models/flashcard.dart';
 import '../services/firestore_service.dart';
-import '../services/auth_service.dart'; // Dù không gọi, giữ lại vẫn tốt
 
 class LearningScreen extends StatefulWidget {
-  // SỬA: Nhận vào FlashcardSet
-  final FlashcardSet set; 
+  final FlashcardSet set;
   const LearningScreen({super.key, required this.set});
 
   @override
@@ -18,21 +15,20 @@ class LearningScreen extends StatefulWidget {
 }
 
 class _LearningScreenState extends State<LearningScreen> with TickerProviderStateMixin {
-  // SỬA: Khởi tạo service
   final FirestoreService _db = FirestoreService();
   
-  // MỚI: State cho FutureBuilder
   late Future<List<Flashcard>> _cardsFuture;
 
-  // SỬA: Các biến này sẽ được khởi tạo SAU KHI Future hoàn thành
+  // Dữ liệu cho phiên học hiện tại
   List<Flashcard> cards = [];
   late List<bool> rememberedCards;
   
   int index = 0;
   bool showAnswer = false;
-  bool showTip = true;
+  // ĐÃ XÓA: bool showTip = true;
+  
   DateTime? _sessionStartTime;
-  bool _isSessionInitialized = false; // Flag để tránh khởi tạo lại
+  bool _isSessionInitialized = false;
 
   late AnimationController _flipController;
   late AnimationController _progressController;
@@ -43,16 +39,11 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
     super.initState();
     _sessionStartTime = DateTime.now();
     
-    // MỚI: Bắt đầu tải thẻ ngay lập tức
-    // Nếu là bài học công khai, truyền userId để lấy từ user khác
     _cardsFuture = _db.getFlashcardsOnce(
       widget.set.id,
       userId: widget.set.isPublic ? widget.set.userId : null,
     );
 
-    // BỎ: Khởi tạo 'cards' ở đây
-    // cards = [...widget.category.cards];
-    
     _flipController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -66,9 +57,6 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
     _flipAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _flipController, curve: Curves.easeInOutCubic),
     );
-    
-    // BỎ: _progressController.forward();
-    // Sẽ forward() sau khi FutureBuilder tải xong
   }
 
   @override
@@ -79,10 +67,8 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
   }
 
   void _toggleCard() {
-    // ... (Giữ nguyên logic)
     setState(() {
       showAnswer = !showAnswer;
-      showTip = false;
     });
     
     if (showAnswer) {
@@ -93,7 +79,6 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
   }
 
   void markAsRemembered(bool remembered) {
-    // ... (Giữ nguyên logic)
     setState(() {
       rememberedCards[index] = remembered;
       
@@ -109,106 +94,155 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
     });
   }
 
-  Future<void> _showCompletionDialog() async {
-    // ... (Giữ nguyên logic, SỬA tên biến)
-    final remembered = rememberedCards.where((e) => e).length;
-    final total = cards.length;
-    final percentage = (total == 0) ? 0 : (remembered / total * 100).toInt();
+  // Hàm khởi động lại phiên học với danh sách thẻ cụ thể
+  void _restartSession(List<Flashcard> newCards) {
+    if (newCards.isEmpty) return;
     
+    setState(() {
+      cards = newCards;
+      rememberedCards = List.filled(cards.length, false);
+      index = 0;
+      showAnswer = false;
+      _flipController.reset();
+      _progressController.reset();
+      _progressController.forward();
+      _sessionStartTime = DateTime.now();
+    });
+    Navigator.of(context).pop(); // Đóng dialog
+  }
+
+  Future<void> _showCompletionDialog() async {
+    final rememberedCount = rememberedCards.where((e) => e).length;
+    final total = cards.length;
+    final percentage = (total == 0) ? 0 : (rememberedCount / total * 100).toInt();
+    
+    // Tách danh sách để dùng cho các nút chức năng
+    final forgottenList = <Flashcard>[];
+    final rememberedList = <Flashcard>[];
+    
+    for (int i = 0; i < cards.length; i++) {
+      if (rememberedCards[i]) {
+        rememberedList.add(cards[i]);
+      } else {
+        forgottenList.add(cards[i]);
+      }
+    }
+
+    // Lưu thống kê vào Firebase
     if (_sessionStartTime != null) {
       final duration = DateTime.now().difference(_sessionStartTime!);
       try {
         await _db.recordLearningSession(
-          categoryId: widget.set.id, // SỬA
-          categoryName: widget.set.title, // SỬA
+          categoryId: widget.set.id,
+          categoryName: widget.set.title,
           duration: duration,
-          cardsLearned: remembered,
+          cardsLearned: rememberedCount,
         );
       } catch (e) {
-        print("Lỗi khi lưu buổi học: $e");
+        debugPrint("Lỗi khi lưu buổi học: $e");
       }
     }
     
+    if (!mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ... (Icon)
+              // Icon Cup
               Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                   ),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.emoji_events, color: Colors.white, size: 48),
+                child: const Icon(Icons.emoji_events, color: Colors.white, size: 40),
               ),
-              const SizedBox(height: 24),
-              // ... (Title)
-              Text(
+              const SizedBox(height: 16),
+              
+              // Tiêu đề & Kết quả
+              const Text(
                 'Hoàn thành!',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
-                'Bạn đã học xong ${widget.set.title}', // SỬA
+                'Bạn đã nhớ $rememberedCount/$total thẻ ($percentage%)',
                 style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              // ... (Stats box)
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      '$percentage%',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF6366F1),
+
+              // --- CÁC NÚT CHỨC NĂNG MỚI ---
+              
+              // 1. Nút Ôn tập từ chưa nhớ (chỉ hiện nếu có từ chưa nhớ)
+              if (forgottenList.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _restartSession(forgottenList),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
+                      child: Text('Ôn ${forgottenList.length} từ chưa nhớ', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
-                    Text(
-                      'Đã nhớ $remembered/$total thẻ',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                  ),
+                ),
+
+              // 2. Nút Ôn tập từ đã nhớ (chỉ hiện nếu có từ đã nhớ)
+              if (rememberedList.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => _restartSession(rememberedList),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF10B981)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text('Ôn ${rememberedList.length} từ đã nhớ', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                     ),
-                  ],
+                  ),
+                ),
+
+              // 3. Nút Học lại tất cả
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => _restartSession(cards), // cards lúc này là danh sách đầy đủ của phiên vừa rồi
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Học lại tất cả', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
-              // ... (Button)
+
+              // 4. Nút Kết thúc (Thoát)
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: TextButton(
                   onPressed: () {
-                    Navigator.of(context)..pop()..pop();
+                    Navigator.of(context).pop(); // Đóng dialog
+                    Navigator.of(context).pop(); // Thoát màn hình học
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF6366F1),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    'Hoàn tất',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
+                  child: Text('Kết thúc', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
                 ),
               ),
             ],
@@ -220,11 +254,9 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    // SỬA: Dùng FutureBuilder
     return FutureBuilder<List<Flashcard>>(
       future: _cardsFuture,
       builder: (context, snapshot) {
-        // 1. Đang tải
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
             appBar: AppBar(title: Text(widget.set.title)),
@@ -232,7 +264,6 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
           );
         }
 
-        // 2. Bị lỗi
         if (snapshot.hasError) {
           return Scaffold(
             appBar: AppBar(title: Text(widget.set.title)),
@@ -240,7 +271,6 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
           );
         }
 
-        // 3. Tải xong, không có thẻ
         final loadedCards = snapshot.data ?? [];
         if (loadedCards.isEmpty) {
           return Scaffold(
@@ -249,16 +279,13 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
           );
         }
 
-        // 4. MỚI: Khởi tạo state của phiên học (chỉ 1 lần)
         if (!_isSessionInitialized) {
           cards = loadedCards;
           rememberedCards = List.filled(cards.length, false);
-          _progressController.forward(); // Bắt đầu animation
+          _progressController.forward();
           _isSessionInitialized = true;
         }
 
-        // 5. Build UI chính
-        // (Kiểm tra lại phòng trường hợp state chưa kịp build)
         if (cards.isEmpty) {
            return Scaffold(
             appBar: AppBar(title: Text(widget.set.title)),
@@ -271,24 +298,25 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
     );
   }
 
-  // MỚI: Tách UI chính ra
   Widget _buildLearningUI(BuildContext context) {
     final card = cards[index];
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? Color(0xFF0F172A) : Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(isDark),
             _buildProgressBar(isDark),
-            if (showTip) _buildTipCard(),
+            // ĐÃ XÓA: if (showTip) _buildTipCard(),
+            
             Expanded(
               child: Center(
                 child: _buildFlashcard(card, isDark),
               ),
             ),
+            
             _buildActionButtons(isDark),
             const SizedBox(height: 20),
           ],
@@ -303,7 +331,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Color(0xFF1E293B)),
+            icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : const Color(0xFF1E293B)),
             onPressed: () => Navigator.pop(context),
           ),
           const SizedBox(width: 12),
@@ -312,11 +340,11 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.set.title, // SỬA
+                  widget.set.title,
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Color(0xFF1E293B),
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
                   ),
                 ),
                 Text(
@@ -332,14 +360,14 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
               ),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               '${index + 1}/${cards.length}',
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
@@ -350,11 +378,6 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
     );
   }
 
-  // ... (Tất cả các hàm _build... khác đều giữ nguyên) ...
-  // ... (_buildProgressBar, _buildTipCard, _buildFlashcard, _buildCardFront, _buildCardBack, _buildActionButtons) ...
-  
-  // (Copy y hệt các hàm build UI phụ trợ từ file gốc của bạn)
-  
   Widget _buildProgressBar(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -367,8 +390,8 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
                   borderRadius: BorderRadius.circular(10),
                   child: LinearProgressIndicator(
                     value: (index + 1) / cards.length,
-                    backgroundColor: isDark ? Color(0xFF1E293B) : Colors.grey[200],
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                    backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.grey[200],
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
                     minHeight: 8,
                   ),
                 ),
@@ -377,16 +400,16 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle, color: Color(0xFF10B981), size: 16),
+                    const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 16),
                     const SizedBox(width: 4),
                     Text(
                       '${rememberedCards.where((e) => e).length}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Color(0xFF10B981),
                         fontWeight: FontWeight.bold,
                       ),
@@ -401,43 +424,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
     );
   }
 
-  Widget _buildTipCard() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: AnimatedSlide(
-        duration: const Duration(milliseconds: 300),
-        offset: Offset.zero,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.lightbulb_outline, color: Color(0xFFD97706)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Chạm vào thẻ để xem nghĩa',
-                  style: TextStyle(
-                    color: Color(0xFFD97706),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.close, color: Color(0xFFD97706), size: 20),
-                onPressed: () => setState(() => showTip = false),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // ĐÃ XÓA: Widget _buildTipCard()
 
   Widget _buildFlashcard(Flashcard card, bool isDark) {
     return GestureDetector(
@@ -472,7 +459,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
       height: 420,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
@@ -480,7 +467,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: Color(0xFF6366F1).withOpacity(0.4),
+            color: const Color(0xFF6366F1).withOpacity(0.4),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -497,7 +484,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
           const SizedBox(height: 24),
           Text(
             text,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -513,11 +500,11 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Row(
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.touch_app, color: Colors.white, size: 16),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text(
                   'Chạm để lật',
                   style: TextStyle(color: Colors.white, fontSize: 12),
@@ -536,7 +523,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
       height: 420,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFF10B981), Color(0xFF059669)],
@@ -544,7 +531,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: Color(0xFF10B981).withOpacity(0.4),
+            color: const Color(0xFF10B981).withOpacity(0.4),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -561,7 +548,7 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
           const SizedBox(height: 24),
           Text(
             text,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -577,8 +564,8 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Text(
-              'Nghĩa tiếng Việt',
+            child: const Text(
+              'Chạm để lật',
               style: TextStyle(color: Colors.white, fontSize: 12),
             ),
           ),
@@ -590,68 +577,40 @@ class _LearningScreenState extends State<LearningScreen> with TickerProviderStat
   Widget _buildActionButtons(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: showAnswer ? null : _toggleCard,
-                  icon: Icon(Icons.flip),
-                  label: Text('Xoay thẻ'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark ? Color(0xFF334155) : Colors.white,
-                    foregroundColor: isDark ? Colors.white : Color(0xFF64748B),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                    side: BorderSide(
-                      color: isDark ? Color(0xFF475569) : Color(0xFFE2E8F0),
-                    ),
-                  ),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => markAsRemembered(false),
+              icon: const Icon(Icons.close_rounded),
+              label: const Text('Chưa nhớ'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                elevation: 0,
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => markAsRemembered(false),
-                  icon: Icon(Icons.close_rounded),
-                  label: Text('Chưa nhớ'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFFEF4444),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                  ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => markAsRemembered(true),
+              icon: const Icon(Icons.check_rounded),
+              label: const Text('Đã nhớ'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                elevation: 0,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => markAsRemembered(true),
-                  icon: Icon(Icons.check_rounded),
-                  label: Text('Đã nhớ'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),

@@ -11,7 +11,7 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Lấy trạng thái theme hiện tại từ hệ thống để hiển thị đúng màu
+    // Lấy trạng thái theme hiện tại
     final bool isDarkTheme = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
@@ -99,6 +99,7 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Nhắc nhở học tập',
                 subtitle: 'Quản lý lịch nhắc nhở',
                 onTap: () {
+                  // Chuyển hướng đến màn hình DANH SÁCH nhắc nhở
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => const ReminderListScreen()),
@@ -128,7 +129,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           
-          // === KHÁC ===
+          // === KHÁC (ĐĂNG XUẤT) ===
           _buildSectionHeader('Khác', isDarkTheme),
           _buildSettingsCard(
             context,
@@ -241,25 +242,6 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showComingSoon(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text('Sắp ra mắt'),
-        content: const Text('Tính năng này đang được phát triển và sẽ sớm có mặt!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showLogoutDialog(BuildContext context) {
     final auth = AuthService();
     showDialog(
@@ -280,11 +262,14 @@ class SettingsScreen extends StatelessWidget {
               Navigator.pop(dialogContext);
               try {
                 await auth.signOut();
-                // Không cần làm gì thêm, StreamBuilder ở AuthWrapper sẽ tự điều hướng về LoginScreen
+                // AuthWrapper ở main.dart sẽ tự động điều hướng về màn hình đăng nhập
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Lỗi khi đăng xuất: ${e.toString()}'), backgroundColor: Colors.red),
+                    SnackBar(
+                      content: Text('Lỗi khi đăng xuất: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               }
