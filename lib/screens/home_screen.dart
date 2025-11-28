@@ -16,6 +16,7 @@ import 'notification_screen.dart';
 import 'statistics_screen.dart';
 import 'folders_list_screen.dart';
 import 'public_lessons_screen.dart';
+import 'search_delegate.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -82,7 +83,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   Icons.search,
                   color: isDark ? Colors.white : Colors.black87,
                 ),
-                onPressed: () {},
+                onPressed: () {
+                  showSearch(
+                    context: context,
+                    delegate: FlashcardSearchDelegate(),
+                  );
+                },
               ),
               // Nút thông báo (Chỉ hiện ở tab Trang chủ để đỡ rối)
               if (selectedTab == 0)
@@ -336,8 +342,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 25),
-          
-          // My Folders and My Notes cards
           _buildHomeItemCard(
             context,
             'Flashcard của tôi',

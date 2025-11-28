@@ -680,7 +680,7 @@ class FirestoreService {
     required int cardsLearned,
   }) async {
     if (_uid == null) throw Exception("Chưa đăng nhập");
-
+    
     var ref = _db.collection('users').doc(_uid).collection('sessions');
     await ref.add({
       'type': 'learning',
@@ -690,13 +690,13 @@ class FirestoreService {
       'cardsLearned': cardsLearned,
       'timestamp': Timestamp.now(),
     });
-
+    double hoursToAdd = duration.inSeconds / 3600.0;
+    
     final userRef = _db.collection('users').doc(_uid);
     await userRef.update({
-      'stats.totalHours': FieldValue.increment(duration.inHours > 0 ? duration.inHours : (duration.inMinutes / 60)),
+      'stats.totalHours': FieldValue.increment(hoursToAdd),
     });
-
-    // SỬA LỖI Ở ĐÂY
+    
     await addNotification(
       title: 'Hoàn thành bài học',
       body: 'Bạn đã học $cardsLearned thẻ trong bài "$categoryName". Cố gắng phát huy nhé!',
@@ -712,7 +712,7 @@ class FirestoreService {
     required int totalQuestions,
   }) async {
     if (_uid == null) throw Exception("Chưa đăng nhập");
-
+    
     var ref = _db.collection('users').doc(_uid).collection('sessions');
     await ref.add({
       'type': 'quiz',
@@ -723,11 +723,15 @@ class FirestoreService {
       'totalQuestions': totalQuestions,
       'timestamp': Timestamp.now(),
     });
-
+    double hoursToAdd = duration.inSeconds / 3600.0;
+    final userRef = _db.collection('users').doc(_uid);
+    await userRef.update({
+      'stats.totalHours': FieldValue.increment(hoursToAdd),
+    });
+    
     String message = 'Bạn đạt $quizScore/$totalQuestions điểm.';
     if (quizScore == totalQuestions) message = 'Xuất sắc! Bạn đúng tất cả các câu hỏi!';
-
-    // SỬA LỖI Ở ĐÂY: Bỏ dấu nháy đơn quanh tham số type
+    
     await addNotification(
       title: 'Kết quả Quiz: $categoryName',
       body: message,
@@ -782,5 +786,32 @@ class FirestoreService {
     }
 
     return result;
+  }
+
+  Future<void> fixDataMismatch() async {
+    if (_uid == null) return;
+    
+    // 1. Lấy tất cả bộ thẻ
+    final setsSnapshot = await _db.collection('users').doc(_uid).collection('flashcard_sets').get();
+    
+    int totalCardsCalculated = 0;
+    int totalNotesCalculated = 0;
+    
+    // 2. Duyệt qua từng bộ thẻ để đếm lại
+    for (var doc in setsSnapshot.docs) {
+      final cardsSnapshot = await doc.reference.collection('cards').get();
+      final realCount = cardsSnapshot.size;
+      
+      // Cập nhật lại số lượng đúng cho bộ thẻ này
+      await doc.reference.update({'cardCount': realCount});
+      
+      totalCardsCalculated += realCount;
+    }
+    final notesSnapshot = await _db.collection('users').doc(_uid).collection('notes').get();
+    totalNotesCalculated = notesSnapshot.size;
+    await _db.collection('users').doc(_uid).update({
+      'stats.totalFlashcards': totalCardsCalculated,
+      'stats.totalNotes': totalNotesCalculated,
+    });
   }
 }

@@ -14,6 +14,39 @@ class FoldersListScreen extends StatefulWidget {
 
 class _FoldersListScreenState extends State<FoldersListScreen> {
   final FirestoreService _db = FirestoreService();
+  bool _isFixing = false; // Biến trạng thái để hiển thị loading khi đang sửa lỗi
+
+  @override
+  void initState() {
+    super.initState();
+    // Tự động chạy đồng bộ dữ liệu ngay sau khi màn hình được hiển thị lần đầu
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fixData(silent: true); // silent: true để không hiện thông báo làm phiền mỗi lần vào
+    });
+  }
+
+  // Hàm gọi lệnh sửa lỗi từ Service
+  // silent: Nếu true thì sẽ không hiện thông báo "Thành công" (dùng khi chạy tự động)
+  Future<void> _fixData({bool silent = false}) async {
+    if (!mounted) return;
+    setState(() => _isFixing = true);
+    try {
+      await _db.fixDataMismatch();
+      if (mounted && !silent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã đồng bộ lại dữ liệu thành công!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isFixing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +59,34 @@ class _FoldersListScreenState extends State<FoldersListScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
+        actions: [
+          // Hiển thị loading khi đang đồng bộ (tự động hoặc thủ công)
+          if (_isFixing)
+            const Center(child: Padding(
+              padding: EdgeInsets.only(right: 16.0),
+              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            ))
+          else
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'fix') _fixData(silent: false); // Bấm tay thì hiện thông báo
+              },
+              itemBuilder: (BuildContext context) {
+                return [
+                  const PopupMenuItem<String>(
+                    value: 'fix',
+                    child: Row(
+                      children: [
+                        Icon(Icons.sync, color: Colors.blue),
+                        SizedBox(width: 8),
+                        Text('Đồng bộ lại số lượng'),
+                      ],
+                    ),
+                  ),
+                ];
+              },
+            ),
+        ],
       ),
       body: StreamBuilder<List<FlashcardSet>>(
         stream: _db.getFlashcardSetsStream(),
@@ -325,4 +386,3 @@ class _FoldersListScreenState extends State<FoldersListScreen> {
     );
   }
 }
-

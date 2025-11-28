@@ -24,20 +24,30 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(card == null ? 'Thêm flashcard' : 'Sửa flashcard'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: frontController,
-              decoration: const InputDecoration(labelText: 'Mặt trước'),
-              autofocus: true,
-              textInputAction: TextInputAction.next,
-            ),
-            TextField(
-              controller: backController,
-              decoration: const InputDecoration(labelText: 'Mặt sau'),
-            ),
-          ],
+        content: SingleChildScrollView( // Thêm cuộn để tránh che phím
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: frontController,
+                maxLength: 100,
+                decoration: const InputDecoration(
+                  labelText: 'Mặt trước'
+                ),
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: backController,
+                // SỬA: Giới hạn 100 ký tự
+                maxLength: 100,
+                decoration: const InputDecoration(
+                  labelText: 'Mặt sau'
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
@@ -101,7 +111,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                       await _db.deleteFlashcard(widget.set.id, card.id);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Đã xoá flashcard!')));
+                          const SnackBar(content: Text('Đã xoá flashcard!')));
                       }
                     } catch (e) {
                       if (mounted) {
@@ -200,25 +210,24 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                                           subtitle: Text(fc.vietnamese),
                                           leading: Text('${idx + 1}'),
                                           trailing: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              IconButton(
-                                                  icon: const Icon(Icons.edit),
-                                                  onPressed: () {
-                                                    Navigator.pop(context);
-                                                    addOrEditFlashcard(
-                                                        card: fc,
-                                                        editIndex: idx);
-                                                  }),
-                                              IconButton(
-                                                  icon:
-                                                      const Icon(Icons.delete),
-                                                  onPressed: () {
-                                                    Navigator.pop(context);
-                                                    deleteFlashcard(fc);
-                                                  }),
-                                            ],
-                                          ),
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                    icon: const Icon(Icons.edit),
+                                                    onPressed: () {
+                                                      Navigator.pop(context);
+                                                      addOrEditFlashcard(
+                                                          card: fc,
+                                                          editIndex: idx);
+                                                    }),
+                                                IconButton(
+                                                    icon:
+                                                        const Icon(Icons.delete),
+                                                    onPressed: () {
+                                                      Navigator.pop(context);
+                                                      deleteFlashcard(fc);
+                                                    }),
+                                              ]),
                                         );
                                       },
                                     ),
@@ -246,8 +255,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                       setState(() => showMeaning = !showMeaning);
                     },
                     child: SizedBox(
-                      width: 280, // Tăng chiều rộng lên một chút
-                      height: 180, // Tăng chiều cao lên một chút
+                      width: 250,
+                      height: 150,
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 550),
                         transitionBuilder:
@@ -284,10 +293,9 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                             Stack(children: [if (widget != null) widget, ...list]),
                         switchInCurve: Curves.easeInOutBack,
                         switchOutCurve: Curves.easeInOutBack,
-                        
-                        // 🔥 ĐÃ SỬA PHẦN NỘI DUNG THẺ ĐỂ KHÔNG BỊ TRÀN
                         child: Container(
                           key: ValueKey(showMeaning),
+                          padding: const EdgeInsets.all(16), // Thêm padding cho chữ
                           decoration: BoxDecoration(
                             color: showMeaning
                                 ? Colors.teal[100]
@@ -302,24 +310,14 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                             ],
                           ),
                           alignment: Alignment.center,
-                          
-                          // Sử dụng Padding để chữ không dính lề
-                          padding: const EdgeInsets.all(16.0),
-                          
-                          child: FittedBox( // Tự động thu nhỏ nếu chữ quá to
+                          child: FittedBox( // SỬA: Tự động thu nhỏ chữ nếu quá dài
                             fit: BoxFit.scaleDown,
-                            child: ConstrainedBox(
-                              // Giới hạn chiều rộng để chữ tự xuống dòng
-                              constraints: const BoxConstraints(maxWidth: 250), 
-                              child: Text(
-                                showMeaning ? card.vietnamese : card.english,
-                                style: const TextStyle(
-                                    fontSize: 28, fontWeight: FontWeight.bold),
-                                textDirection: TextDirection.ltr,
-                                textAlign: TextAlign.center,
-                                maxLines: 6, // Giới hạn tối đa 6 dòng
-                                overflow: TextOverflow.ellipsis, // Thêm dấu ... nếu vẫn tràn
-                              ),
+                            child: Text(
+                              showMeaning ? card.vietnamese : card.english,
+                              style: const TextStyle(
+                                  fontSize: 28, fontWeight: FontWeight.bold),
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ),
